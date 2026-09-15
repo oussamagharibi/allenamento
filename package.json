@@ -1,0 +1,23 @@
+{
+  "name": "allenamento",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Web app di allenamento con schede personalizzate, progressi e coach AI",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node scripts/check.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
+    "connect-pg-simple": "^10.0.0",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.1.0",
+    "express-session": "^1.18.1",
+    "pg": "^8.13.1"
+  }
+}
