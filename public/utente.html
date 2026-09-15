@@ -35,37 +35,84 @@
   </div>
 
   <main class="schermata">
-    <div style="text-align:center; margin-bottom:var(--s-5)">
-      <h1>Chi si allena?</h1>
-      <p class="aiuto">Scegli il tuo profilo o creane uno nuovo.</p>
-    </div>
-
     <div id="messaggio" class="messaggio errore nascosto"></div>
 
-    <div class="card">
-      <div id="griglia" class="griglia-avatar">
-        <div class="skeleton alto"></div>
-        <div class="skeleton alto"></div>
-        <div class="skeleton alto"></div>
+    <!-- Passo 1: scelta del profilo -->
+    <section id="passo-profilo">
+      <div style="text-align:center; margin-bottom:var(--s-5)">
+        <h1>Chi si allena?</h1>
+        <p class="aiuto">Scegli il tuo profilo o creane uno nuovo.</p>
       </div>
-      <p class="aiuto" id="posti"></p>
-    </div>
 
-    <div class="card nascosto" id="card-nuovo">
-      <h2>Nuovo profilo</h2>
-      <form id="form-utente" autocomplete="off">
-        <div class="campo">
-          <label for="nome">Come ti chiami?</label>
-          <input type="text" id="nome" name="nome" required maxlength="30" autocomplete="off" autocapitalize="words" placeholder="Il tuo nome">
+      <div class="card">
+        <div id="griglia" class="griglia-avatar">
+          <div class="skeleton alto"></div>
+          <div class="skeleton alto"></div>
+          <div class="skeleton alto"></div>
         </div>
-        <div class="riga-bottoni">
-          <button type="submit" id="invia" class="btn-principale" style="flex:1">
-            <i data-lucide="arrow-right"></i> Continua
+        <p class="aiuto" id="posti"></p>
+      </div>
+
+      <div class="card nascosto" id="card-nuovo">
+        <h2>Nuovo profilo</h2>
+        <form id="form-nome" autocomplete="off">
+          <div class="campo">
+            <label for="nome">Come ti chiami?</label>
+            <input type="text" id="nome" name="nome" required maxlength="30" autocomplete="off" autocapitalize="words" placeholder="Il tuo nome">
+          </div>
+          <div class="riga-bottoni">
+            <button type="submit" id="avanti-nome" class="btn-principale" style="flex:1">
+              <i data-lucide="arrow-right"></i> Continua
+            </button>
+            <button type="button" class="btn-contorno" id="annulla-nuovo">Annulla</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- Passo 2: password personale del profilo -->
+    <section id="passo-password" class="nascosto">
+      <div style="text-align:center; margin-bottom:var(--s-4)">
+        <div id="avatar-scelto" style="display:flex; justify-content:center; margin-bottom:var(--s-3)"></div>
+        <h1 id="titolo-password">Bentornato</h1>
+        <p class="aiuto" id="sottotitolo-password"></p>
+      </div>
+
+      <div class="card card-accento">
+        <div id="errore-password" class="messaggio errore nascosto"></div>
+        <form id="form-password" autocomplete="off">
+          <div class="campo">
+            <label for="password">Password</label>
+            <div class="campo-password">
+              <input type="password" id="password" required minlength="6" autocomplete="current-password" placeholder="Almeno 6 caratteri">
+              <button type="button" class="occhio" data-mostra="password" aria-label="Mostra la password" title="Mostra la password">
+                <i data-lucide="eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="campo nascosto" id="campo-conferma">
+            <label for="conferma">Ripeti la password</label>
+            <div class="campo-password">
+              <input type="password" id="conferma" minlength="6" autocomplete="new-password" placeholder="La stessa password">
+              <button type="button" class="occhio" data-mostra="conferma" aria-label="Mostra la password" title="Mostra la password">
+                <i data-lucide="eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" id="entra" class="btn-principale btn-blocco btn-grande">
+            <i data-lucide="log-in"></i> Entra
           </button>
-          <button type="button" class="btn-contorno" id="annulla-nuovo">Annulla</button>
+        </form>
+        <div class="riga-bottoni" style="margin-top:var(--s-3)">
+          <button type="button" class="btn-contorno btn-blocco" id="indietro">
+            <i data-lucide="arrow-left"></i> Cambia profilo
+          </button>
         </div>
-      </form>
-    </div>
+        <p class="aiuto" id="nota-password"></p>
+      </div>
+    </section>
   </main>
 
   <footer class="pie">Non sostituisce il parere di un medico o personal trainer</footer>

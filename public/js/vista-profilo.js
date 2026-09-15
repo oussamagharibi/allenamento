@@ -296,6 +296,77 @@
     }
   }
 
+  // Cambio password: serve quella attuale, poi le altre sessioni vengono chiuse.
+  function sicurezzaHtml() {
+    const haPassword = Stato.haPassword !== false;
+    let html = '<div class="card"><div class="card-testa"><h2>' +
+      '<i data-lucide="shield-check"></i> Password</h2></div>';
+    html += '<div id="esito-password" class="messaggio nascosto"></div>';
+    html += '<form id="form-cambio-password" autocomplete="off">';
+    if (haPassword) {
+      html += '<div class="campo"><label for="pw-attuale">Password attuale</label>' +
+        '<div class="campo-password"><input type="password" id="pw-attuale" autocomplete="current-password" required>' +
+        '<button type="button" class="occhio" data-mostra="pw-attuale" aria-label="Mostra la password">' +
+        '<i data-lucide="eye"></i></button></div></div>';
+    } else {
+      html += '<div class="messaggio avviso">Questo profilo non ha ancora una password: impostala adesso.</div>';
+    }
+    html += '<div class="campo"><label for="pw-nuova">Nuova password</label>' +
+      '<div class="campo-password"><input type="password" id="pw-nuova" minlength="6" autocomplete="new-password" required placeholder="Almeno 6 caratteri">' +
+      '<button type="button" class="occhio" data-mostra="pw-nuova" aria-label="Mostra la password">' +
+      '<i data-lucide="eye"></i></button></div></div>';
+    html += '<div class="campo"><label for="pw-conferma">Ripeti la nuova password</label>' +
+      '<div class="campo-password"><input type="password" id="pw-conferma" minlength="6" autocomplete="new-password" required>' +
+      '<button type="button" class="occhio" data-mostra="pw-conferma" aria-label="Mostra la password">' +
+      '<i data-lucide="eye"></i></button></div></div>';
+    html += '<button type="submit" id="salva-password" class="btn-principale btn-blocco">' +
+      '<i data-lucide="key-round"></i> ' + (haPassword ? 'Cambia password' : 'Imposta password') + '</button>';
+    html += '</form>';
+    html += '<p class="aiuto">Dopo il cambio le altre sessioni di questo profilo vengono chiuse.</p>';
+    html += '</div>';
+    return html;
+  }
+
+  function collegaSicurezza() {
+    const form = document.getElementById('form-cambio-password');
+    if (!form) return;
+    const esito = document.getElementById('esito-password');
+    const bottone = document.getElementById('salva-password');
+
+    form.querySelectorAll('[data-mostra]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        const campo = document.getElementById(b.dataset.mostra);
+        const visibile = campo.type === 'text';
+        campo.type = visibile ? 'password' : 'text';
+        b.innerHTML = '<i data-lucide="' + (visibile ? 'eye' : 'eye-off') + '"></i>';
+        b.setAttribute('aria-label', visibile ? 'Mostra la password' : 'Nascondi la password');
+        App.icone();
+      });
+    });
+
+    form.addEventListener('submit', async function (evento) {
+      evento.preventDefault();
+      App.pulisci(esito);
+      const attuale = document.getElementById('pw-attuale');
+      App.occupato(bottone, true, 'Salvo...');
+      try {
+        const dati = await App.api('POST', '/api/auth/password', {
+          attuale: attuale ? attuale.value : '',
+          nuova: document.getElementById('pw-nuova').value,
+          conferma: document.getElementById('pw-conferma').value,
+        });
+        Stato.haPassword = true;
+        App.toast('Password aggiornata' + (dati.sessioni_chiuse ? ', altre sessioni chiuse: ' + dati.sessioni_chiuse : ''), 'ok');
+        await App.ricarica();
+      } catch (err) {
+        App.occupato(bottone, false);
+        App.mostra(esito, err.message, 'errore');
+        App.vibra(60);
+        App.icone();
+      }
+    });
+  }
+
   function dettagliProfilo(p) {
     const zone = String(p.infortuni || '').trim();
     let html = '<div class="statistiche">';
@@ -332,11 +403,13 @@
         '<button type="button" class="btn-contorno btn-piccolo" id="modifica"><i data-lucide="pencil"></i> Modifica</button></div>' +
         dettagliProfilo(p) + '</div>';
       html += '<div class="card"><h2>I tuoi numeri</h2>' + riepilogoHtml(Stato.riepilogo) + '</div>';
+      html += sicurezzaHtml();
       html += '<div class="card"><div class="card-testa"><h2>Aspetto</h2>' +
         '<button type="button" class="btn-contorno btn-piccolo" data-tema-toggle></button></div>' +
         '<p class="aiuto">Il tema scelto resta salvato su questo dispositivo.</p></div>';
       el.innerHTML = html;
       App.collegaTema();
+      collegaSicurezza();
       App.icone();
 
       document.getElementById('modifica').addEventListener('click', function () {

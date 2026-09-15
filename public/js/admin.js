@@ -47,7 +47,9 @@
     html += '<div class="esercizio-testa">';
     html += '<div style="display:flex; align-items:center; gap:var(--s-3)">' + App.avatarHtml(u.name, 'piccolo') +
       '<div><strong>' + App.testoSicuro(u.name) + '</strong><br>' +
-      '<span class="tag ' + (u.profilo ? 'verde' : '') + '">' + (u.profilo ? 'profilo completo' : 'senza profilo') + '</span></div></div>';
+      '<span class="tag ' + (u.profilo ? 'verde' : '') + '">' + (u.profilo ? 'profilo completo' : 'senza profilo') + '</span> ' +
+      '<span class="tag ' + (u.ha_password ? '' : 'acceso') + '">' +
+      (u.ha_password ? 'password attiva' : 'senza password') + '</span></div></div>';
     html += '<span class="prescrizione">' + u.sessioni + (u.sessioni === 1 ? ' sessione' : ' sessioni') + '</span>';
     html += '</div>';
 
@@ -60,6 +62,7 @@
     html += '<button type="button" class="btn-contorno btn-piccolo" data-azione="rinomina"><i data-lucide="pencil"></i> Rinomina</button>';
     html += '<button type="button" class="btn-contorno btn-piccolo" data-azione="azzera-ai"><i data-lucide="sparkles"></i> Azzera AI</button>';
     html += '<button type="button" class="btn-contorno btn-piccolo" data-azione="sessioni"><i data-lucide="log-out"></i> Sessioni</button>';
+    html += '<button type="button" class="btn-contorno btn-piccolo" data-azione="reset-password"><i data-lucide="key-round"></i> Reset password</button>';
     html += '<button type="button" class="btn-pericolo btn-piccolo" data-azione="reset"><i data-lucide="eraser"></i> Azzera dati</button>';
     html += '<button type="button" class="btn-pericolo btn-piccolo" data-azione="elimina"><i data-lucide="trash-2"></i> Elimina</button>';
     html += '</div>';
@@ -200,6 +203,20 @@
       try {
         await api('POST', '/api/admin/utenti/' + id + '/azzera-ai', {});
         App.toast('Contatore AI azzerato per ' + utente.name, 'ok');
+        await ricarica();
+      } catch (err) {
+        App.occupato(bottone, false);
+        App.toast(err.message, 'errore');
+      }
+      return;
+    }
+
+    if (azione === 'reset-password') {
+      App.occupato(bottone, true, '...');
+      try {
+        const dati = await api('POST', '/api/admin/utenti/' + id + '/reset-password', {});
+        App.toast('Password azzerata per ' + utente.name + ': la reimposta al prossimo accesso' +
+          (dati.chiuse ? ' (sessioni chiuse: ' + dati.chiuse + ')' : ''), 'ok');
         await ricarica();
       } catch (err) {
         App.occupato(bottone, false);

@@ -115,6 +115,7 @@ router.get('/utenti', async (req, res, next) => {
   try {
     const utenti = await db.tutte(
       `SELECT u.id, u.name, u.created_at, u.last_login,
+              (u.pin_hash IS NOT NULL) AS ha_password,
               (SELECT COUNT(*) FROM workouts w WHERE w.user_id = u.id)::int AS allenamenti,
               (SELECT COUNT(*) FROM workouts w WHERE w.user_id = u.id AND w.completato)::int AS completati,
               (SELECT COUNT(*) FROM weight_logs l WHERE l.user_id = u.id)::int AS pesate,
@@ -175,6 +176,8 @@ router.get('/backup', async (req, res, next) => {
 
 // Raccoglie tutti i dati di un utente. Funziona sia sul pool sia dentro una transazione.
 async function raccogliDati(esecutore, userId) {
+  // Le colonne sono elencate una per una: pin_hash non deve finire ne
+  // nell esportazione ne nelle copie di sicurezza.
   const utente = (await esecutore.query('SELECT id, name, created_at, last_login FROM users WHERE id = $1', [userId])).rows[0];
   if (!utente) return null;
   const profilo = (await esecutore.query('SELECT * FROM profiles WHERE user_id = $1', [userId])).rows[0] || null;
@@ -370,6 +373,33 @@ router.post('/utenti/:id/azzera-ai', async (req, res, next) => {
     res.json({ ok: true, restanti: C.LIMITE_AI_GIORNALIERO });
   } catch (err) {
     next(err);
+  }
+});
+
+// Azzera la password del profilo: al prossimo accesso l utente ne imposta una nuova.
+router.post('/utenti/:id/reset-password', async (req, res, next) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ errore: 'Utente non valido.' });
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const utente = (await client.query('SELECT id, name FROM users WHERE id = $1 FOR UPDATE', [id])).rows[0];
+    if (!utente) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ errore: 'Utente non trovato.' });
+    }
+    await client.query('UPDATE users SET pin_hash = NULL WHERE id = $1', [id]);
+    const chiuse = await cancellaSessioni(client, id);
+    // Nel registro finisce solo il nome: mai la password ne il suo hash.
+    await registraLog(client, 'reset password', utente.name);
+    await client.query('COMMIT');
+    res.json({ ok: true, chiuse });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    next(err);
+  } finally {
+    client.release();
   }
 });
 

@@ -49,6 +49,20 @@ Note: il filesystem di Railway viene ricreato a ogni deploy, quindi l'app non sc
 nulla su disco — tutti i dati (utenti, sessioni, allenamenti, report AI) stanno su PostgreSQL.
 In produzione la connessione usa SSL con `rejectUnauthorized: false`.
 
+## Accesso
+
+Due livelli: prima la password del sito (`SITE_PASSWORD`), poi il profilo con la
+**sua** password personale. Un profilo nuovo la sceglie al momento della creazione;
+i profili nati prima di questa funzione la impostano al primo accesso successivo.
+Le password stanno in `users.pin_hash` con hash bcrypt (`bcryptjs`, cost 12) e non
+escono mai dal server: sono escluse da esportazioni, copie di sicurezza e registri.
+
+Protezioni: minimo 6 caratteri, 5 tentativi sbagliati ogni 15 minuti per ogni
+coppia nome + indirizzo IP, messaggio di errore sempre generico ("Password errata")
+e sessione rigenerata dopo ogni accesso riuscito. Dal profilo si cambia la password
+(serve quella attuale) e le altre sessioni aperte vengono chiuse; dal pannello admin
+si puo azzerare la password di un utente, che ne imposta una nuova al rientro.
+
 ## Interfaccia
 
 Tema scuro di default con interruttore chiaro/scuro (la scelta resta in un cookie,

@@ -113,6 +113,7 @@
       }
       Stato.utente = stato.utente;
       Stato.aiConfigurata = Boolean(stato.ai_configurata);
+      Stato.haPassword = Boolean(stato.ha_password);
       document.getElementById('chip-utente').innerHTML =
         App.avatarHtml(stato.utente.nome, 'piccolo') + '<span>' + App.testoSicuro(stato.utente.nome) + '</span>';
 
