@@ -1,0 +1,179 @@
+/* Stile mobile-first: colonna singola, testo grande, tocchi comodi. */
+:root {
+  --sfondo: #0f1419;
+  --sfondo-2: #171e26;
+  --sfondo-3: #1f2833;
+  --bordo: #2c3744;
+  --testo: #e8edf2;
+  --testo-2: #9aa9b8;
+  --accento: #4ade80;
+  --accento-scuro: #16a34a;
+  --info: #60a5fa;
+  --errore: #f87171;
+  --avviso: #fbbf24;
+  --raggio: 12px;
+  --spazio: 16px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--sfondo);
+  color: var(--testo);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+body { min-height: 100vh; display: flex; flex-direction: column; }
+
+a { color: var(--accento); }
+
+h1, h2, h3 { line-height: 1.25; margin: 0 0 12px; }
+h1 { font-size: 1.5rem; }
+h2 { font-size: 1.2rem; }
+h3 { font-size: 1.05rem; }
+p { margin: 0 0 12px; }
+
+.contenitore {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--spazio);
+  flex: 1;
+}
+
+.centrato {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 80vh;
+}
+
+.card {
+  background: var(--sfondo-2);
+  border: 1px solid var(--bordo);
+  border-radius: var(--raggio);
+  padding: var(--spazio);
+  margin-bottom: var(--spazio);
+}
+
+.card h2 { display: flex; align-items: center; gap: 8px; }
+
+.marchio { text-align: center; margin-bottom: 24px; }
+.marchio .logo { font-size: 2.2rem; }
+.marchio p { color: var(--testo-2); margin: 4px 0 0; }
+
+label { display: block; font-size: 0.9rem; color: var(--testo-2); margin-bottom: 6px; }
+
+input[type="text"], input[type="password"], input[type="number"],
+input[type="date"], select, textarea {
+  width: 100%;
+  padding: 12px;
+  background: var(--sfondo-3);
+  color: var(--testo);
+  border: 1px solid var(--bordo);
+  border-radius: 10px;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid var(--accento);
+  outline-offset: 1px;
+}
+
+textarea { min-height: 80px; resize: vertical; }
+
+.campo { margin-bottom: 14px; }
+.griglia-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.scelte { display: flex; flex-wrap: wrap; gap: 8px; }
+.scelte label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--sfondo-3);
+  border: 1px solid var(--bordo);
+  border-radius: 999px;
+  padding: 8px 14px;
+  margin: 0;
+  color: var(--testo);
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+.scelte input { accent-color: var(--accento-scuro); margin: 0; }
+
+button, .bottone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px 16px;
+  background: var(--accento);
+  color: #06210f;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+button:hover, .bottone:hover { background: #6ee7a0; }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+button.secondario {
+  background: var(--sfondo-3);
+  color: var(--testo);
+  border: 1px solid var(--bordo);
+}
+button.secondario:hover { background: #26313d; }
+
+button.piccolo { width: auto; padding: 8px 12px; font-size: 0.88rem; }
+.riga-bottoni { display: flex; gap: 10px; flex-wrap: wrap; }
+.riga-bottoni button { width: auto; flex: 1 1 140px; }
+
+.messaggio {
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  font-size: 0.93rem;
+  border: 1px solid transparent;
+}
+.messaggio.errore { background: rgba(248, 113, 113, 0.12); border-color: var(--errore); color: #fecaca; }
+.messaggio.ok { background: rgba(74, 222, 128, 0.12); border-color: var(--accento); color: #bbf7d0; }
+.messaggio.avviso { background: rgba(251, 191, 36, 0.12); border-color: var(--avviso); color: #fde68a; }
+.messaggio.info { background: rgba(96, 165, 250, 0.12); border-color: var(--info); color: #bfdbfe; }
+.nascosto { display: none !important; }
+
+.aiuto { color: var(--testo-2); font-size: 0.85rem; margin-top: 6px; }
+
+footer {
+  border-top: 1px solid var(--bordo);
+  padding: 16px;
+  text-align: center;
+  color: var(--testo-2);
+  font-size: 0.8rem;
+}
+
+.caricamento {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: gira 0.8s linear infinite;
+}
+@keyframes gira { to { transform: rotate(360deg); } }
+
+@media (min-width: 640px) {
+  h1 { font-size: 1.8rem; }
+  .contenitore { padding: 24px; }
+}

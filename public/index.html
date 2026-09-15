@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Allenamento - Accesso</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="contenitore centrato">
+    <div class="marchio">
+      <div class="logo">&#127947;</div>
+      <h1>Allenamento</h1>
+      <p>Schede, progressi e coach AI</p>
+    </div>
+
+    <div class="card">
+      <h2>Password del sito</h2>
+      <div id="messaggio" class="messaggio errore nascosto"></div>
+      <form id="form-sito" autocomplete="off">
+        <div class="campo">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required autocomplete="current-password">
+        </div>
+        <button type="submit" id="invia">Entra</button>
+      </form>
+      <p class="aiuto">Dopo 5 tentativi sbagliati l'accesso si blocca per 15 minuti.</p>
+    </div>
+  </main>
+
+  <footer>Non sostituisce il parere di un medico o personal trainer</footer>
+  <script src="/js/comune.js"></script>
+  <script src="/js/accesso.js"></script>
+</body>
+</html>

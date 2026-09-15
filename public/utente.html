@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Allenamento - Chi sei?</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="contenitore centrato">
+    <div class="marchio">
+      <div class="logo">&#128100;</div>
+      <h1>Chi si allena?</h1>
+      <p>Scrivi il tuo nome per entrare nel tuo profilo</p>
+    </div>
+
+    <div class="card">
+      <div id="messaggio" class="messaggio errore nascosto"></div>
+      <form id="form-utente" autocomplete="off">
+        <div class="campo">
+          <label for="nome">Nome</label>
+          <input type="text" id="nome" name="nome" required maxlength="30" autocomplete="off" autocapitalize="words">
+          <p class="aiuto">Se il nome esiste gia' entri nel profilo esistente, altrimenti ne viene creato uno nuovo.</p>
+        </div>
+        <button type="submit" id="invia">Continua</button>
+      </form>
+      <p class="aiuto" id="posti"></p>
+    </div>
+
+    <div class="riga-bottoni">
+      <button type="button" class="secondario" id="logout">Esci dal sito</button>
+    </div>
+  </main>
+
+  <footer>Non sostituisce il parere di un medico o personal trainer</footer>
+  <script src="/js/comune.js"></script>
+  <script src="/js/utente.js"></script>
+</body>
+</html>
