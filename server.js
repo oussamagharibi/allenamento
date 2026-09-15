@@ -69,12 +69,22 @@ app.get('/app', paginaUtente, (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, 'app.html'));
 });
 
+// Pannello di amministrazione: senza ADMIN_PASSWORD non esiste.
+app.get('/admin', (req, res) => {
+  if (!process.env.ADMIN_PASSWORD) {
+    console.log('[admin] disattivato');
+    return res.status(404).type('text/plain; charset=utf-8').send('Non trovato');
+  }
+  res.sendFile(path.join(PUBLIC_DIR, 'admin.html'));
+});
+
 // API
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/profilo', require('./routes/profilo'));
 app.use('/api/allenamenti', require('./routes/allenamenti'));
 app.use('/api/progressi', require('./routes/progressi'));
 app.use('/api/ai', require('./routes/ai'));
+app.use('/api/admin', require('./routes/admin'));
 
 app.use('/api', (req, res) => res.status(404).json({ errore: 'Endpoint non trovato' }));
 app.use((req, res) => res.redirect('/'));
@@ -89,6 +99,8 @@ app.use((err, req, res, next) => {
 async function avvia() {
   console.log(`[avvio] ambiente: ${inProduzione ? 'produzione' : 'sviluppo'}`);
   console.log(`[avvio] AI: ${process.env.ANTHROPIC_API_KEY ? 'configurata' : 'non configurata'}`);
+  if (process.env.ADMIN_PASSWORD) console.log('[avvio] pannello admin attivo su /admin');
+  else console.log('[admin] disattivato');
   try {
     await migra();
   } catch (err) {

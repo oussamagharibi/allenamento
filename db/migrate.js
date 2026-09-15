@@ -67,6 +67,29 @@ const SQL = [
    )`,
 
   `CREATE INDEX IF NOT EXISTS ai_reports_user_idx ON ai_reports (user_id, created_at DESC)`,
+
+  // Ultimo accesso: aggiunto dopo, quindi va creato anche sui database gia esistenti.
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ`,
+
+  // Copia di sicurezza creata prima di ogni azzeramento o eliminazione dal pannello admin.
+  `CREATE TABLE IF NOT EXISTS admin_backups (
+     id         SERIAL PRIMARY KEY,
+     user_name  TEXT NOT NULL,
+     dati       JSONB NOT NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   )`,
+
+  `CREATE INDEX IF NOT EXISTS admin_backups_data_idx ON admin_backups (created_at DESC)`,
+
+  // Storico delle operazioni admin. Non contiene mai password.
+  `CREATE TABLE IF NOT EXISTS admin_log (
+     id         SERIAL PRIMARY KEY,
+     azione     TEXT NOT NULL,
+     target     TEXT,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   )`,
+
+  `CREATE INDEX IF NOT EXISTS admin_log_data_idx ON admin_log (created_at DESC)`,
 ];
 
 async function migra() {

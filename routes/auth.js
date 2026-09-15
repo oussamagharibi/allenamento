@@ -122,6 +122,8 @@ router.post('/utente', apiSito, async (req, res, next) => {
     }
 
     req.session.userId = utente.id;
+    // Serve al pannello admin per sapere chi si e collegato di recente.
+    await db.query('UPDATE users SET last_login = now() WHERE id = $1', [utente.id]);
     const profilo = await db.uno('SELECT user_id FROM profiles WHERE user_id = $1', [utente.id]);
     req.session.save((err) => {
       if (err) return res.status(500).json({ errore: 'Impossibile salvare la sessione.' });

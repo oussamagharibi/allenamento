@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Allenamento - Amministrazione</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="testata">
+    <div class="testata-riga">
+      <span class="titolo">&#128274; Amministrazione</span>
+      <span class="utente" id="stato-admin">non collegato</span>
+    </div>
+  </header>
+
+  <main class="contenitore">
+    <div id="messaggio-globale" class="messaggio nascosto"></div>
+
+    <section id="vista-login">
+      <div class="card">
+        <h2>Master password</h2>
+        <div id="errore-login" class="messaggio errore nascosto"></div>
+        <form id="form-admin" autocomplete="off">
+          <div class="campo">
+            <label for="password">Password amministratore</label>
+            <input type="password" id="password" required autocomplete="current-password">
+          </div>
+          <button type="submit" id="entra">Entra</button>
+        </form>
+        <p class="aiuto">Dopo 5 tentativi sbagliati l accesso si blocca per 15 minuti.
+          La sessione admin scade dopo 30 minuti di inattivita.</p>
+      </div>
+    </section>
+
+    <section id="vista-pannello" class="nascosto">
+      <div class="card">
+        <h2>Utenti</h2>
+        <p class="aiuto" id="riepilogo-utenti"></p>
+        <div id="elenco-utenti"></div>
+      </div>
+
+      <div class="card">
+        <h2>Copie di sicurezza</h2>
+        <p class="aiuto">Create automaticamente prima di ogni azzeramento o eliminazione.</p>
+        <div id="elenco-backup"></div>
+      </div>
+
+      <div class="card">
+        <h2>Storico operazioni</h2>
+        <div id="elenco-log"></div>
+      </div>
+
+      <div class="riga-bottoni">
+        <button type="button" class="secondario" id="esci">Esci dal pannello</button>
+        <button type="button" class="secondario" id="vai-app">Vai all app</button>
+      </div>
+    </section>
+  </main>
+
+  <footer>Non sostituisce il parere di un medico o personal trainer</footer>
+
+  <script src="/js/comune.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

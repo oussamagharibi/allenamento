@@ -23,6 +23,7 @@ Variabili d'ambiente:
 | `DATABASE_URL` | sì | Connessione PostgreSQL |
 | `SITE_PASSWORD` | sì | Password della prima pagina |
 | `SESSION_SECRET` | sì | Segreto dei cookie di sessione |
+| `ADMIN_PASSWORD` | no | Master password del pannello `/admin`. Senza, `/admin` risponde 404 |
 | `ANTHROPIC_API_KEY` | no | Senza chiave l'app funziona, il Coach AI mostra "AI non configurata" |
 | `CLAUDE_MODEL` | no | Default `claude-sonnet-5` |
 | `PORT` | no | Default `3000` (su Railway viene impostata automaticamente) |
@@ -36,6 +37,7 @@ Variabili d'ambiente:
    - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (riferimento al servizio Postgres)
    - `SITE_PASSWORD` = la password del sito
    - `SESSION_SECRET` = una stringa lunga e casuale
+   - `ADMIN_PASSWORD` = master password del pannello admin (opzionale)
    - `ANTHROPIC_API_KEY` = la chiave Anthropic (opzionale)
    - `CLAUDE_MODEL` = `claude-sonnet-5` (opzionale)
    - `NODE_ENV` = `production`
@@ -46,6 +48,16 @@ Variabili d'ambiente:
 Note: il filesystem di Railway viene ricreato a ogni deploy, quindi l'app non scrive
 nulla su disco — tutti i dati (utenti, sessioni, allenamenti, report AI) stanno su PostgreSQL.
 In produzione la connessione usa SSL con `rejectUnauthorized: false`.
+
+## Pannello di amministrazione
+
+Su `/admin`, protetto da `ADMIN_PASSWORD` (accesso separato da quello degli utenti,
+sessione che scade dopo 30 minuti, 5 tentativi sbagliati ogni 15 minuti). Permette di
+vedere gli utenti con ultimo accesso e statistiche, esportare i dati in JSON, azzerare
+i dati di un utente, eliminarlo, rinominarlo, azzerare il contatore AI del giorno e
+chiudere le sue sessioni. Prima di ogni azzeramento o eliminazione viene creata una
+copia di sicurezza in `admin_backups`, ripristinabile dal pannello; ogni operazione
+finisce in `admin_log`. Se `ADMIN_PASSWORD` non e impostata, `/admin` risponde 404.
 
 ## Struttura
 
