@@ -253,3 +253,98 @@ footer {
 .statistica .etichetta { font-size: 0.78rem; color: var(--testo-2); text-transform: uppercase; letter-spacing: 0.04em; }
 .statistica .valore { font-size: 1.25rem; font-weight: 700; }
 .statistica .nota { font-size: 0.78rem; color: var(--testo-2); }
+
+/* --- Esercizi e serie --- */
+.esercizio {
+  background: var(--sfondo-3);
+  border: 1px solid var(--bordo);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+.esercizio-testa {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.esercizio-testa .prescrizione {
+  color: var(--accento);
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--sfondo);
+  border: 1px solid var(--bordo);
+  color: var(--testo-2);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.piccolo-testo { font-size: 0.85rem; padding: 8px 10px; }
+
+.serie-griglia { margin: 10px 0; display: flex; flex-direction: column; gap: 6px; }
+.serie-riga { display: flex; align-items: center; gap: 6px; }
+.serie-riga input { padding: 8px; text-align: center; max-width: 88px; }
+.serie-numero {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 50%;
+  background: var(--sfondo-2);
+  border: 1px solid var(--bordo);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  color: var(--testo-2);
+}
+.serie-unita { color: var(--testo-2); font-size: 0.82rem; }
+
+/* --- Elenco sedute --- */
+.elenco { list-style: none; margin: 0 0 14px; padding: 0; }
+.elenco li { margin-bottom: 6px; }
+.riga-elenco {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--sfondo-3);
+  border: 1px solid var(--bordo);
+  color: var(--testo);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: left;
+}
+.riga-elenco:hover { background: #26313d; }
+.riga-elenco .titolo-seduta { flex: 1; color: var(--testo-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.riga-elenco .stato { color: var(--testo-2); font-size: 0.8rem; white-space: nowrap; }
+.riga-elenco .stato.fatto { color: var(--accento); }
+
+/* --- Timer di recupero --- */
+.timer {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 16px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--sfondo-2);
+  border: 1px solid var(--accento);
+  border-radius: 999px;
+  padding: 10px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.timer-testo { font-size: 0.95rem; }
+.timer-testo strong { color: var(--accento); font-variant-numeric: tabular-nums; }
