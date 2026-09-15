@@ -14,10 +14,12 @@
     App.occupato(bottone, true, 'Verifico...');
     try {
       await App.api('POST', '/api/auth/sito', { password: campo.value });
+      App.toast('Accesso riuscito', 'ok', 1200);
       window.location.href = '/utente';
     } catch (err) {
       App.occupato(bottone, false);
       App.mostra(messaggio, err.message, 'errore');
+      App.vibra(60);
       campo.select();
     }
   });

@@ -1,186 +1,338 @@
-/* Vista Allenamento: seduta del giorno, timer di recupero, registrazione serie,
-   sostituzione esercizi e completamento. */
+/* Vista Allenamento: panoramica della settimana e sessione guidata,
+   con un esercizio per volta, timer circolare e vibrazione a fine recupero. */
 (function () {
   'use strict';
 
   const Viste = window.Viste || (window.Viste = {});
-  const Stato = window.Stato || (window.Stato = {});
 
   const NOMI_FASI = {
     riscaldamento: 'Riscaldamento',
     principale: 'Allenamento',
-    stretching: 'Stretching finale',
+    stretching: 'Stretching',
+  };
+  const ICONE_FASI = {
+    riscaldamento: 'sunrise',
+    principale: 'flame',
+    stretching: 'leaf',
   };
 
-  let timer = { id: null, restanti: 0, barra: null, etichetta: null };
-  // Seduta mostrata al momento: la vista viene ridisegnata piu volte, ma il
-  // gestore dei click resta uno solo.
-  let corrente = null;
+  const RAGGIO = 92;
+  const CIRCONFERENZA = 2 * Math.PI * RAGGIO;
 
-  function barraTimer() {
-    if (timer.barra) return timer.barra;
-    const barra = document.createElement('div');
-    barra.className = 'timer nascosto';
-    barra.innerHTML = '<span class="timer-testo">Recupero <strong id="timer-valore">0:00</strong></span>' +
-      '<button type="button" class="piccolo secondario" id="timer-stop">Salta</button>';
-    document.body.appendChild(barra);
-    barra.querySelector('#timer-stop').addEventListener('click', fermaTimer);
-    timer.barra = barra;
-    timer.etichetta = barra.querySelector('#timer-valore');
-    return barra;
+  let contenitore = null;   // sezione della vista
+  let corrente = null;      // seduta aperta
+  let indice = 0;           // esercizio mostrato
+  let inSessione = false;
+  let timer = { id: null, restanti: 0, totale: 0, schermo: null };
+
+  // --- Timer circolare --------------------------------------------------------
+
+  function chiudiTimer() {
+    if (timer.id) clearInterval(timer.id);
+    timer.id = null;
+    if (timer.schermo) {
+      timer.schermo.remove();
+      timer.schermo = null;
+    }
   }
 
   function formattaTempo(secondi) {
     const m = Math.floor(secondi / 60);
     const s = secondi % 60;
-    return m + ':' + String(s).padStart(2, '0');
+    return (m > 0 ? m + ':' + String(s).padStart(2, '0') : String(s));
   }
 
-  function fermaTimer() {
-    if (timer.id) clearInterval(timer.id);
-    timer.id = null;
-    if (timer.barra) timer.barra.classList.add('nascosto');
+  function aggiornaTimer() {
+    if (!timer.schermo) return;
+    const testo = timer.schermo.querySelector('[data-tempo]');
+    const cerchio = timer.schermo.querySelector('.avanza');
+    testo.textContent = timer.restanti > 0 ? formattaTempo(timer.restanti) : 'Via!';
+    const quota = timer.totale ? timer.restanti / timer.totale : 0;
+    cerchio.style.strokeDashoffset = String(CIRCONFERENZA * (1 - quota));
   }
 
-  function avviaTimer(secondi) {
-    const barra = barraTimer();
-    fermaTimer();
-    timer.restanti = Math.max(5, Number(secondi) || 60);
-    timer.etichetta.textContent = formattaTempo(timer.restanti);
-    barra.classList.remove('nascosto');
+  function avviaTimer(secondi, titolo) {
+    chiudiTimer();
+    timer.totale = Math.max(5, Number(secondi) || 60);
+    timer.restanti = timer.totale;
+
+    const schermo = document.createElement('div');
+    schermo.className = 'timer-schermo';
+    schermo.setAttribute('role', 'dialog');
+    schermo.setAttribute('aria-label', titolo || 'Recupero');
+    schermo.innerHTML =
+      '<div class="timer-blocco">' +
+      '<div class="timer-cerchio">' +
+      '<svg width="210" height="210" viewBox="0 0 210 210" aria-hidden="true">' +
+      '<circle class="traccia" cx="105" cy="105" r="' + RAGGIO + '" fill="none" stroke-width="12"></circle>' +
+      '<circle class="avanza" cx="105" cy="105" r="' + RAGGIO + '" fill="none" stroke-width="12"' +
+      ' stroke-dasharray="' + CIRCONFERENZA.toFixed(1) + '" stroke-dashoffset="0"></circle>' +
+      '</svg>' +
+      '<div class="dentro"><strong data-tempo aria-live="polite">' + formattaTempo(timer.restanti) + '</strong></div>' +
+      '</div>' +
+      '<p class="etichetta-sezione">' + App.testoSicuro(titolo || 'Recupero') + '</p>' +
+      '<div class="riga-bottoni" style="justify-content:center">' +
+      '<button type="button" class="btn-contorno" data-timer="piu"><i data-lucide="plus"></i> 30s</button>' +
+      '<button type="button" class="btn-principale" data-timer="chiudi"><i data-lucide="x"></i> Chiudi</button>' +
+      '</div></div>';
+    document.body.appendChild(schermo);
+    timer.schermo = schermo;
+    App.icone();
+
+    schermo.querySelector('[data-timer="chiudi"]').addEventListener('click', chiudiTimer);
+    schermo.querySelector('[data-timer="piu"]').addEventListener('click', function () {
+      timer.restanti += 30;
+      timer.totale = Math.max(timer.totale, timer.restanti);
+      timer.schermo.querySelector('.timer-cerchio').classList.remove('finito');
+      if (!timer.id) avviaConteggio();
+      aggiornaTimer();
+    });
+
+    avviaConteggio();
+    aggiornaTimer();
+  }
+
+  function avviaConteggio() {
     timer.id = setInterval(function () {
       timer.restanti--;
+      aggiornaTimer();
       if (timer.restanti <= 0) {
-        timer.etichetta.textContent = 'finito!';
         clearInterval(timer.id);
         timer.id = null;
-        setTimeout(fermaTimer, 2500);
-        return;
+        if (timer.schermo) timer.schermo.querySelector('.timer-cerchio').classList.add('finito');
+        // Avviso anche a schermo spento, dove il telefono lo permette.
+        App.vibra([220, 120, 220]);
+        setTimeout(chiudiTimer, 2600);
       }
-      timer.etichetta.textContent = formattaTempo(timer.restanti);
     }, 1000);
   }
 
-  function unita(e) {
-    return e.misura === 'secondi' ? 'sec' : 'rip';
-  }
+  // --- Pezzi comuni -----------------------------------------------------------
+
+  function unita(e) { return e.misura === 'secondi' ? 'sec' : 'rip'; }
 
   function prescrizione(e) {
-    const q = App.numero(e.ripetizioni, 0) + ' ' + unita(e);
-    if (Number(e.serie) > 1) return e.serie + ' serie x ' + q;
-    return q;
+    const quantita = App.numero(e.ripetizioni, 0) + ' ' + unita(e);
+    return Number(e.serie) > 1 ? e.serie + ' x ' + quantita : quantita;
   }
 
-  function esercizioHtml(e, indice, modificabile) {
-    const log = Array.isArray(e.log) ? e.log : [];
-    let html = '<div class="esercizio" data-indice="' + indice + '">';
-    html += '<div class="esercizio-testa">';
-    html += '<div><strong>' + App.testoSicuro(e.nome) + '</strong>';
-    html += '<span class="tag">' + App.testoSicuro(e.gruppo) + '</span></div>';
-    html += '<span class="prescrizione">' + App.testoSicuro(prescrizione(e)) + '</span>';
-    html += '</div>';
+  function serieFatte(e) {
+    return (Array.isArray(e.log) ? e.log : []).filter(function (s) { return Number(s.ripetizioni) > 0; }).length;
+  }
 
+  function avanzamentoSessione() {
+    const totale = corrente.esercizi.length;
+    return Math.round(((indice + 1) / totale) * 100);
+  }
+
+  // --- Panoramica -------------------------------------------------------------
+
+  function settimanaHtml(lista) {
+    let html = '<div class="card"><div class="card-testa"><h2>La tua settimana</h2>' +
+      '<button type="button" class="btn-contorno btn-piccolo" id="genera-scheda">' +
+      '<i data-lucide="refresh-cw"></i> Rigenera</button></div>';
+    if (!lista.length) {
+      html += '<p class="aiuto">Non hai ancora una scheda.</p>' +
+        '<button type="button" class="btn-principale btn-blocco" id="genera-scheda-vuoto">' +
+        '<i data-lucide="wand-sparkles"></i> Genera la scheda</button>';
+    } else {
+      html += '<ul class="elenco">';
+      for (const a of lista) {
+        html += '<li><button type="button" class="riga-elenco" data-apri="' + a.id + '">' +
+          '<span>' + App.testoSicuro(App.giornoSettimana(a.data).slice(0, 3)) + ' ' + App.dataIta(a.data).slice(0, 6) + '</span>' +
+          '<span class="titolo-seduta">' + App.testoSicuro(a.titolo || 'Seduta') + '</span>' +
+          '<span class="stato ' + (a.completato ? 'fatto' : '') + '">' +
+          (a.completato ? 'fatto' : a.numero_esercizi + ' es.') + '</span></button></li>';
+      }
+      html += '</ul><p class="aiuto">Rigenerando sostituisci solo le sedute future non ancora completate.</p>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function anteprimaSeduta(a, oggi) {
+    const principali = a.esercizi.filter(function (e) { return e.fase === 'principale'; });
+    let html = '<div class="card card-accento">';
+    html += '<span class="tag ' + (a.completato ? 'verde' : 'acceso') + '">' +
+      (a.completato ? 'Completato' : (oggi ? 'Oggi' : App.giornoSettimana(a.data))) + '</span>';
+    html += '<h2 style="margin-top:var(--s-2)">' + App.testoSicuro(a.titolo || 'Seduta') + '</h2>';
+    html += '<p class="aiuto">' + App.dataIta(a.data) + ' &middot; ' + principali.length + ' esercizi principali' +
+      (a.origine === 'ai' ? ' &middot; dal Coach AI' : '') + '</p>';
+
+    html += '<ul class="lista-secca">';
+    for (const e of principali.slice(0, 5)) {
+      html += '<li>' + App.testoSicuro(e.nome) + ' - ' + App.testoSicuro(prescrizione(e)) + '</li>';
+    }
+    if (principali.length > 5) html += '<li>e altri ' + (principali.length - 5) + '...</li>';
+    html += '</ul>';
+
+    html += '<button type="button" class="btn-principale btn-blocco btn-grande" style="margin-top:var(--s-4)" id="inizia">' +
+      '<i data-lucide="play"></i> ' + (a.completato ? 'Rivedi la seduta' : 'Inizia') + '</button>';
+    html += '</div>';
+    return html;
+  }
+
+  // --- Sessione guidata -------------------------------------------------------
+
+  function esercizioHtml(e) {
+    const log = Array.isArray(e.log) ? e.log : [];
+    let html = '<div class="card esercizio-grande">';
+    html += '<span class="tag"><i data-lucide="' + ICONE_FASI[e.fase] + '"></i> ' + NOMI_FASI[e.fase] + '</span>';
+    html += '<div class="nome-esercizio">' + App.testoSicuro(e.nome) + '</div>';
+    html += '<div class="dettaglio">' + App.testoSicuro(prescrizione(e)) + '</div>';
     if (Number(e.carico) > 0) {
       html += '<p class="aiuto">Carico suggerito: ' + App.numero(e.carico, 1) + ' kg</p>';
     }
     if (e.progressione) {
-      html += '<div class="messaggio ok piccolo-testo">' + App.testoSicuro(e.progressione) + '</div>';
+      html += '<div class="messaggio ok" style="text-align:left">' + App.testoSicuro(e.progressione) + '</div>';
     }
-    if (e.note) {
-      html += '<p class="aiuto">' + App.testoSicuro(e.note) + '</p>';
-    }
+    if (e.note) html += '<p class="aiuto">' + App.testoSicuro(e.note) + '</p>';
+    html += '</div>';
 
-    if (e.fase === 'principale' && modificabile) {
-      html += '<div class="serie-griglia">';
+    if (e.fase === 'principale' && !corrente.completato) {
+      html += '<div class="card"><h3>Registra le serie</h3><div class="serie-griglia">';
       for (let s = 0; s < Number(e.serie); s++) {
         const fatta = log[s] || {};
         const rip = fatta.ripetizioni !== undefined ? fatta.ripetizioni : e.ripetizioni;
         const carico = fatta.carico !== undefined ? fatta.carico : (Number(e.carico) || '');
-        html += '<div class="serie-riga">';
-        html += '<span class="serie-numero">' + (s + 1) + '</span>';
-        html += '<input type="number" class="serie-rip" min="0" max="500" step="1" value="' +
-          App.testoSicuro(rip) + '" aria-label="' + unita(e) + ' serie ' + (s + 1) + '">';
-        html += '<span class="serie-unita">' + unita(e) + '</span>';
-        html += '<input type="number" class="serie-carico" min="0" max="500" step="0.5" value="' +
-          App.testoSicuro(carico) + '" placeholder="0" aria-label="carico serie ' + (s + 1) + '">';
-        html += '<span class="serie-unita">kg</span>';
-        html += '</div>';
+        html += '<div class="serie-riga' + (Number(fatta.ripetizioni) > 0 ? ' fatta' : '') + '">' +
+          '<span class="serie-numero">' + (s + 1) + '</span>' +
+          '<input type="number" class="serie-rip" inputmode="numeric" min="0" max="500" step="1" value="' + App.testoSicuro(rip) +
+          '" aria-label="' + unita(e) + ' serie ' + (s + 1) + '">' +
+          '<span class="serie-unita">' + unita(e) + '</span>' +
+          '<input type="number" class="serie-carico" inputmode="decimal" min="0" max="500" step="0.5" value="' + App.testoSicuro(carico) +
+          '" placeholder="0" aria-label="carico serie ' + (s + 1) + '">' +
+          '<span class="serie-unita">kg</span></div>';
       }
-      html += '</div>';
-      html += '<div class="riga-bottoni">';
-      html += '<button type="button" class="piccolo" data-azione="salva">Salva serie</button>';
-      html += '<button type="button" class="piccolo secondario" data-azione="timer">Recupero ' + Number(e.recupero) + 's</button>';
-      html += '<button type="button" class="piccolo secondario" data-azione="sostituisci">Sostituisci</button>';
-      html += '</div>';
-      if (log.length) {
-        html += '<p class="aiuto">Registrato: ' + log.map(function (s) {
-          return App.numero(s.ripetizioni, 0) + (Number(s.carico) > 0 ? ' x ' + App.numero(s.carico, 1) + ' kg' : '');
-        }).join(' &middot; ') + '</p>';
-      }
-    } else if (e.fase !== 'principale' && modificabile && e.misura === 'secondi') {
-      html += '<div class="riga-bottoni"><button type="button" class="piccolo secondario" data-azione="timer-esercizio">' +
-        'Avvia ' + Number(e.ripetizioni) + 's</button></div>';
+      html += '</div><div class="riga-bottoni">';
+      html += '<button type="button" class="btn-principale" data-azione="salva" style="flex:1">' +
+        '<i data-lucide="check"></i> Salva e recupera</button>';
+      html += '<button type="button" class="btn-contorno" data-azione="timer"><i data-lucide="timer"></i> ' + Number(e.recupero) + 's</button>';
+      html += '<button type="button" class="btn-contorno" data-azione="sostituisci"><i data-lucide="repeat"></i> Cambia</button>';
+      html += '</div></div>';
+    } else if (e.misura === 'secondi' && !corrente.completato) {
+      html += '<div class="card"><div class="riga-bottoni">' +
+        '<button type="button" class="btn-principale btn-blocco" data-azione="timer-esercizio">' +
+        '<i data-lucide="timer"></i> Avvia ' + Number(e.ripetizioni) + ' secondi</button></div></div>';
     }
 
-    html += '</div>';
     return html;
   }
 
-  function allenamentoHtml(a, oggi) {
-    const esercizi = Array.isArray(a.esercizi) ? a.esercizi : [];
-    const modificabile = !a.completato;
+  function disegnaSessione() {
+    const e = corrente.esercizi[indice];
+    const ultimo = indice === corrente.esercizi.length - 1;
+
     let html = '<div class="card">';
-    html += '<h2>' + (oggi ? 'Allenamento di oggi' : 'Prossimo allenamento') + '</h2>';
-    html += '<p class="aiuto">' + App.dataIta(a.data) + (a.titolo ? ' &middot; ' + App.testoSicuro(a.titolo) : '') +
-      (a.origine === 'ai' ? ' &middot; generato dal Coach AI' : '') + '</p>';
-    if (a.completato) {
-      html += '<div class="messaggio ok">Seduta completata. Bel lavoro!</div>';
-    }
-    html += '<div id="esito-allenamento" class="messaggio nascosto"></div>';
+    html += '<div class="card-testa">';
+    html += '<button type="button" class="btn-contorno btn-piccolo" data-azione="esci"><i data-lucide="arrow-left"></i> Esci</button>';
+    html += '<span class="aiuto" style="margin:0">' + (indice + 1) + ' di ' + corrente.esercizi.length + '</span>';
+    html += '</div>';
+    html += '<div class="avanzamento"><div style="width:' + avanzamentoSessione() + '%"></div></div>';
+    html += '<p class="aiuto">' + App.testoSicuro(corrente.titolo || 'Seduta') + ' &middot; ' + App.dataIta(corrente.data) + '</p>';
+    html += '</div>';
 
-    for (const fase of ['riscaldamento', 'principale', 'stretching']) {
-      const gruppo = esercizi.filter(function (e) { return e.fase === fase; });
-      if (!gruppo.length) continue;
-      html += '<h3>' + NOMI_FASI[fase] + '</h3>';
-      for (const e of gruppo) {
-        html += esercizioHtml(e, esercizi.indexOf(e), modificabile);
-      }
-    }
+    html += esercizioHtml(e);
 
-    html += '<div class="riga-bottoni">';
-    if (a.completato) {
-      html += '<button type="button" class="secondario" data-azione="riapri">Riapri la seduta</button>';
+    html += '<div class="card"><div class="riga-bottoni">';
+    html += '<button type="button" class="btn-contorno" data-azione="prec"' + (indice === 0 ? ' disabled' : '') + '>' +
+      '<i data-lucide="chevron-left"></i> Indietro</button>';
+    if (ultimo) {
+      html += corrente.completato
+        ? '<button type="button" class="btn-contorno" data-azione="riapri" style="flex:1">Riapri la seduta</button>'
+        : '<button type="button" class="btn-lime" data-azione="completa" style="flex:1"><i data-lucide="party-popper"></i> Finisci la seduta</button>';
     } else {
-      html += '<button type="button" data-azione="completa">Segna come completato</button>';
+      html += '<button type="button" class="btn-principale" data-azione="succ" style="flex:1">Avanti <i data-lucide="chevron-right"></i></button>';
     }
     html += '</div></div>';
-    return html;
+
+    contenitore.innerHTML = html;
+    App.icone();
   }
 
-  function settimanaHtml(lista) {
-    let html = '<div class="card"><h2>La tua settimana</h2>';
-    if (!lista.length) {
-      html += '<p>Non hai ancora una scheda. Generala in un secondo.</p>';
-    } else {
-      html += '<ul class="elenco">';
-      for (const a of lista) {
-        html += '<li><button type="button" class="riga-elenco" data-apri="' + a.id + '">';
-        html += '<span>' + App.dataIta(a.data) + '</span>';
-        html += '<span class="titolo-seduta">' + App.testoSicuro(a.titolo || 'Seduta') + '</span>';
-        html += '<span class="stato ' + (a.completato ? 'fatto' : '') + '">' +
-          (a.completato ? 'fatto' : a.numero_esercizi + ' esercizi') + '</span>';
-        html += '</button></li>';
-      }
-      html += '</ul>';
+  // --- Azioni -----------------------------------------------------------------
+
+  async function salvaSerie(bottone) {
+    const e = corrente.esercizi[indice];
+    const righe = contenitore.querySelectorAll('.serie-riga');
+    const serie = Array.prototype.map.call(righe, function (riga) {
+      return {
+        ripetizioni: riga.querySelector('.serie-rip').value,
+        carico: riga.querySelector('.serie-carico').value,
+      };
+    });
+    App.occupato(bottone, true, 'Salvo...');
+    try {
+      const risposta = await App.api('POST', '/api/allenamenti/' + corrente.id + '/serie', {
+        indice: indice,
+        serie: serie,
+      });
+      corrente.esercizi[indice] = risposta.esercizio;
+      App.toast('Serie salvate', 'ok', 1600);
+      avviaTimer(e.recupero, 'Recupero');
+      disegnaSessione();
+    } catch (err) {
+      App.occupato(bottone, false);
+      App.toast(err.message, 'errore');
     }
-    html += '<div class="riga-bottoni"><button type="button" id="genera-scheda">Genera scheda settimanale</button></div>';
-    html += '<p class="aiuto">La nuova scheda sostituisce le sedute future non ancora completate.</p>';
-    html += '</div>';
-    return html;
+  }
+
+  async function sostituisci(bottone) {
+    App.occupato(bottone, true, 'Cerco...');
+    try {
+      const risposta = await App.api('POST', '/api/allenamenti/' + corrente.id + '/sostituisci', { indice: indice });
+      corrente.esercizi[indice] = risposta.esercizio;
+      App.toast('Ora fai: ' + risposta.esercizio.nome, 'ok');
+      disegnaSessione();
+    } catch (err) {
+      App.occupato(bottone, false);
+      App.toast(err.message, 'errore');
+    }
+  }
+
+  async function completa(bottone, valore) {
+    App.occupato(bottone, true, 'Aggiorno...');
+    try {
+      await App.api('POST', '/api/allenamenti/' + corrente.id + '/completa', { completato: valore });
+      chiudiTimer();
+      if (valore) {
+        App.vibra([120, 60, 120, 60, 220]);
+        App.toast('Seduta completata, bravo!', 'ok');
+      } else {
+        App.toast('Seduta riaperta', 'info');
+      }
+      inSessione = false;
+      await Viste.allenamento.mostra(contenitore, corrente.id);
+    } catch (err) {
+      App.occupato(bottone, false);
+      App.toast(err.message, 'errore');
+    }
+  }
+
+  function collegaSessione() {
+    contenitore.addEventListener('click', async function (evento) {
+      const bottone = evento.target.closest('[data-azione]');
+      if (!bottone || !corrente || !inSessione) return;
+      const azione = bottone.dataset.azione;
+      const e = corrente.esercizi[indice];
+
+      if (azione === 'esci') { inSessione = false; chiudiTimer(); Viste.allenamento.mostra(contenitore, corrente.id); return; }
+      if (azione === 'prec') { indice = Math.max(0, indice - 1); disegnaSessione(); return; }
+      if (azione === 'succ') { indice = Math.min(corrente.esercizi.length - 1, indice + 1); disegnaSessione(); return; }
+      if (azione === 'timer') { avviaTimer(e.recupero, 'Recupero'); return; }
+      if (azione === 'timer-esercizio') { avviaTimer(e.ripetizioni, e.nome); return; }
+      if (azione === 'salva') { await salvaSerie(bottone); return; }
+      if (azione === 'sostituisci') { await sostituisci(bottone); return; }
+      if (azione === 'completa') { await completa(bottone, true); return; }
+      if (azione === 'riapri') { await completa(bottone, false); }
+    });
   }
 
   Viste.allenamento = {
     async mostra(el, idRichiesto) {
+      contenitore = el;
+      chiudiTimer();
+
       const settimana = await App.api('GET', '/api/allenamenti/settimana');
       let dati;
       if (idRichiesto) {
@@ -189,109 +341,52 @@
       } else {
         dati = await App.api('GET', '/api/allenamenti/oggi');
       }
-
-      let html = settimanaHtml(settimana.allenamenti || []);
-      if (dati.allenamento) {
-        html += allenamentoHtml(dati.allenamento, dati.oggi);
-      } else {
-        html += '<div class="card"><h2>Nessuna seduta in programma</h2>' +
-          '<p>Genera la scheda settimanale per iniziare.</p></div>';
-      }
-      el.innerHTML = html;
-
       corrente = dati.allenamento;
+      inSessione = false;
 
-      const bottoneGenera = document.getElementById('genera-scheda');
-      bottoneGenera.addEventListener('click', async function () {
-        App.occupato(bottoneGenera, true, 'Genero...');
-        try {
-          await App.api('POST', '/api/allenamenti/genera', {});
-          App.messaggioGlobale('Scheda generata.', 'ok');
-          await Viste.allenamento.mostra(el);
-        } catch (err) {
-          App.occupato(bottoneGenera, false);
-          App.messaggioGlobale(err.message, 'errore');
-        }
-      });
+      let html = '';
+      if (corrente) html += anteprimaSeduta(corrente, dati.oggi);
+      html += settimanaHtml(settimana.allenamenti || []);
+      el.innerHTML = html;
+      App.icone();
+
+      const genera = document.getElementById('genera-scheda') || document.getElementById('genera-scheda-vuoto');
+      if (genera) {
+        genera.addEventListener('click', async function () {
+          App.occupato(genera, true, 'Genero...');
+          try {
+            await App.api('POST', '/api/allenamenti/genera', {});
+            App.toast('Scheda settimanale pronta', 'ok');
+            await Viste.allenamento.mostra(el);
+          } catch (err) {
+            App.occupato(genera, false);
+            App.toast(err.message, 'errore');
+          }
+        });
+      }
 
       el.querySelectorAll('[data-apri]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          Viste.allenamento.mostra(el, b.dataset.apri);
+        b.addEventListener('click', function () { Viste.allenamento.mostra(el, b.dataset.apri); });
+      });
+
+      const inizia = document.getElementById('inizia');
+      if (inizia) {
+        inizia.addEventListener('click', function () {
+          // Si riparte dal primo esercizio non ancora registrato.
+          indice = 0;
+          for (let i = 0; i < corrente.esercizi.length; i++) {
+            const e = corrente.esercizi[i];
+            if (e.fase === 'principale' && serieFatte(e) === 0) { indice = i; break; }
+          }
+          inSessione = true;
+          disegnaSessione();
         });
-      });
+      }
 
-      if (el.dataset.legato) return;
-      el.dataset.legato = '1';
-
-      el.addEventListener('click', async function (evento) {
-        const bottone = evento.target.closest('[data-azione]');
-        if (!bottone || !corrente) return;
-        const esito = document.getElementById('esito-allenamento');
-        const azione = bottone.dataset.azione;
-        const blocco = bottone.closest('.esercizio');
-        const indice = blocco ? Number(blocco.dataset.indice) : null;
-        const esercizio = indice !== null ? corrente.esercizi[indice] : null;
-
-        if (azione === 'timer' && esercizio) {
-          avviaTimer(esercizio.recupero);
-          return;
-        }
-        if (azione === 'timer-esercizio' && esercizio) {
-          avviaTimer(esercizio.ripetizioni);
-          return;
-        }
-        if (azione === 'salva' && esercizio) {
-          const righe = blocco.querySelectorAll('.serie-riga');
-          const serie = Array.prototype.map.call(righe, function (riga) {
-            return {
-              ripetizioni: riga.querySelector('.serie-rip').value,
-              carico: riga.querySelector('.serie-carico').value,
-            };
-          });
-          App.occupato(bottone, true, 'Salvo...');
-          try {
-            const risposta = await App.api('POST', '/api/allenamenti/' + corrente.id + '/serie', {
-              indice: indice,
-              serie: serie,
-            });
-            corrente.esercizi[indice] = risposta.esercizio;
-            App.occupato(bottone, false);
-            App.mostra(esito, 'Serie salvate per ' + risposta.esercizio.nome + '.', 'ok');
-            avviaTimer(esercizio.recupero);
-          } catch (err) {
-            App.occupato(bottone, false);
-            App.mostra(esito, err.message, 'errore');
-          }
-          return;
-        }
-        if (azione === 'sostituisci' && esercizio) {
-          App.occupato(bottone, true, 'Cerco...');
-          try {
-            const risposta = await App.api('POST', '/api/allenamenti/' + corrente.id + '/sostituisci', { indice: indice });
-            corrente.esercizi[indice] = risposta.esercizio;
-            blocco.outerHTML = esercizioHtml(risposta.esercizio, indice, true);
-            App.mostra(esito, 'Esercizio sostituito con ' + risposta.esercizio.nome + '.', 'ok');
-          } catch (err) {
-            App.occupato(bottone, false);
-            App.mostra(esito, err.message, 'errore');
-          }
-          return;
-        }
-        if (azione === 'completa' || azione === 'riapri') {
-          App.occupato(bottone, true, 'Aggiorno...');
-          try {
-            await App.api('POST', '/api/allenamenti/' + corrente.id + '/completa', {
-              completato: azione === 'completa',
-            });
-            fermaTimer();
-            App.messaggioGlobale(azione === 'completa' ? 'Seduta completata!' : 'Seduta riaperta.', 'ok');
-            await Viste.allenamento.mostra(el, corrente.id);
-          } catch (err) {
-            App.occupato(bottone, false);
-            App.mostra(esito, err.message, 'errore');
-          }
-        }
-      });
+      if (!el.dataset.legato) {
+        el.dataset.legato = '1';
+        collegaSessione();
+      }
     },
   };
 })();

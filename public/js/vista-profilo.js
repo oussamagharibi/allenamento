@@ -1,4 +1,4 @@
-/* Vista Profilo: e anche il questionario iniziale (onboarding), sempre modificabile. */
+/* Vista Profilo: riepilogo dei numeri e questionario a passi (anche per le modifiche). */
 (function () {
   'use strict';
 
@@ -6,73 +6,41 @@
   const Stato = window.Stato || (window.Stato = {});
 
   const ETICHETTE = {
-    dimagrire: 'Dimagrire',
-    massa: 'Aumentare la massa',
-    tonificare: 'Tonificare',
-    resistenza: 'Migliorare la resistenza',
-    principiante: 'Principiante',
-    intermedio: 'Intermedio',
-    avanzato: 'Avanzato',
-    uomo: 'Uomo',
-    donna: 'Donna',
-    altro: 'Preferisco non dirlo',
-    casa: 'A casa',
-    palestra: 'In palestra',
-    nessuna: 'Nessuna attrezzatura',
-    manubri: 'Manubri',
-    elastici: 'Elastici',
-    sbarra: 'Sbarra per trazioni',
-    panca: 'Panca',
+    uomo: 'Uomo', donna: 'Donna', altro: 'Preferisco non dirlo',
+    casa: 'A casa', palestra: 'In palestra',
+    manubri: 'Manubri', elastici: 'Elastici', sbarra: 'Sbarra', panca: 'Panca',
+    dimagrire: 'Dimagrire', massa: 'Aumentare la massa',
+    tonificare: 'Tonificare', resistenza: 'Resistenza',
+    principiante: 'Principiante', intermedio: 'Intermedio', avanzato: 'Avanzato',
   };
 
-  function etichetta(valore) {
-    return ETICHETTE[valore] || valore;
-  }
+  const NOTE = {
+    dimagrire: 'Perdere grasso mantenendo il muscolo',
+    massa: 'Costruire muscolo con carichi progressivi',
+    tonificare: 'Rassodare e definire',
+    resistenza: 'Fiato e capacita di durare',
+    principiante: 'Inizio da poco o riparto',
+    intermedio: 'Mi alleno con regolarita',
+    avanzato: 'Anni di allenamento alle spalle',
+    casa: 'Con quello che ho in casa',
+    palestra: 'Ho macchine e bilancieri',
+  };
 
-  function opzioniSelect(valori, selezionato) {
-    return valori
-      .map(function (v) {
-        const sel = v === selezionato ? ' selected' : '';
-        return '<option value="' + App.testoSicuro(v) + '"' + sel + '>' + App.testoSicuro(etichetta(v)) + '</option>';
-      })
-      .join('');
-  }
+  const ICONE = {
+    uomo: 'user', donna: 'user', altro: 'user-round',
+    casa: 'house', palestra: 'building-2',
+    manubri: 'dumbbell', elastici: 'cable', sbarra: 'grip-horizontal', panca: 'armchair',
+    dimagrire: 'flame', massa: 'dumbbell', tonificare: 'activity', resistenza: 'heart-pulse',
+    principiante: 'sprout', intermedio: 'trending-up', avanzato: 'zap',
+  };
 
-  // Riquadro con BMI, calorie e target: usato anche dalla dashboard.
-  function riepilogoHtml(r) {
-    if (!r) return '';
-    let html = '<div class="statistiche">';
-    html += statistica('BMI', App.numero(r.bmi, 1), r.bmi_categoria);
-    html += statistica('Peso sano', App.numero(r.peso_sano.min, 1) + ' - ' + App.numero(r.peso_sano.max, 1) + ' kg', 'BMI 18,5 - 24,9');
-    html += statistica('Metabolismo basale', App.numero(r.metabolismo_basale, 0) + ' kcal', 'a riposo');
-    html += statistica('Fabbisogno', App.numero(r.fabbisogno, 0) + ' kcal', r.attivita_etichetta + ' (x' + App.numero(r.fattore_attivita, 3) + ')');
-    html += statistica('Calorie consigliate', App.numero(r.calorie_consigliate, 0) + ' kcal', 'per il tuo obiettivo');
-    html += '</div>';
-    html += '<p class="aiuto">' + App.testoSicuro(r.calorie_nota) + '</p>';
+  let bozza = null;
+  let passo = 0;
+  const TOTALE_PASSI = 5;
 
-    const t = r.target;
-    html += '<h3>Obiettivo realistico</h3>';
-    if (t.tipo === 'mantenimento') {
-      html += '<p>Peso da mantenere: <strong>' + App.numero(t.peso_obiettivo, 1) + ' kg</strong>.</p>';
-    } else {
-      const verbo = t.tipo === 'perdita' ? 'Da perdere' : 'Da mettere su';
-      html += '<p>Peso obiettivo: <strong>' + App.numero(t.peso_obiettivo, 1) + ' kg</strong>';
-      html += ' &middot; ' + verbo + ': <strong>' + App.numero(t.differenza, 1) + ' kg</strong></p>';
-      if (t.ritmo) {
-        html += '<p>Ritmo consigliato: ' + App.numero(t.ritmo.min, 2) + ' - ' + App.numero(t.ritmo.max, 2) + ' kg a settimana.</p>';
-      }
-      if (t.stima) {
-        html += '<p>Data stimata: tra il <strong>' + App.dataIta(t.stima.data_min) + '</strong> e il <strong>' +
-          App.dataIta(t.stima.data_max) + '</strong> (' + t.stima.settimane_min + ' - ' + t.stima.settimane_max + ' settimane).</p>';
-      }
-    }
-    if (t.nota) html += '<p class="aiuto">' + App.testoSicuro(t.nota) + '</p>';
+  function etichetta(v) { return ETICHETTE[v] || v; }
 
-    for (const avviso of r.avvisi || []) {
-      html += '<div class="messaggio avviso">' + App.testoSicuro(avviso) + '</div>';
-    }
-    return html;
-  }
+  // --- Riepilogo dei numeri ---------------------------------------------------
 
   function statistica(titolo, valore, nota) {
     return '<div class="statistica"><span class="etichetta">' + App.testoSicuro(titolo) + '</span>' +
@@ -80,106 +48,264 @@
       '<span class="nota">' + App.testoSicuro(nota || '') + '</span></div>';
   }
 
-  function formHtml(profilo, opzioni) {
-    const p = profilo || {};
-    const zone = opzioni.zone_infortuni || [];
-    const infortuniTesto = String(p.infortuni || '');
-    const attrezzatura = Array.isArray(p.attrezzatura) ? p.attrezzatura : [];
-    const luogo = p.luogo || 'casa';
-
-    let giorni = [];
-    for (let i = opzioni.giorni.min; i <= opzioni.giorni.max; i++) giorni.push(String(i));
-    let minuti = [];
-    for (let m = opzioni.minuti.min; m <= opzioni.minuti.max; m += 15) minuti.push(String(m));
-    if (p.minuti_sessione && minuti.indexOf(String(p.minuti_sessione)) === -1) {
-      minuti.push(String(p.minuti_sessione));
-      minuti.sort(function (a, b) { return Number(a) - Number(b); });
-    }
-
-    let html = '<form id="form-profilo" autocomplete="off">';
-    html += '<div class="griglia-2">';
-    html += '<div class="campo"><label for="peso">Peso (kg)</label>' +
-      '<input type="number" id="peso" name="peso" step="0.1" min="30" max="300" required value="' + App.testoSicuro(p.peso || '') + '"></div>';
-    html += '<div class="campo"><label for="altezza">Altezza (cm)</label>' +
-      '<input type="number" id="altezza" name="altezza" step="1" min="100" max="250" required value="' + App.testoSicuro(p.altezza || '') + '"></div>';
-    html += '<div class="campo"><label for="eta">Eta (anni)</label>' +
-      '<input type="number" id="eta" name="eta" step="1" min="10" max="100" required value="' + App.testoSicuro(p.eta || '') + '"></div>';
-    html += '<div class="campo"><label for="sesso">Sesso</label><select id="sesso" name="sesso">' +
-      opzioniSelect(opzioni.sessi, p.sesso || 'uomo') + '</select></div>';
+  function riepilogoHtml(r) {
+    if (!r) return '';
+    let html = '<div class="statistiche">';
+    html += statistica('BMI', App.numero(r.bmi, 1), r.bmi_categoria);
+    html += statistica('Peso sano', App.numero(r.peso_sano.min, 1) + ' - ' + App.numero(r.peso_sano.max, 1) + ' kg', 'BMI 18,5 - 24,9');
+    html += statistica('Metabolismo basale', App.numero(r.metabolismo_basale, 0) + ' kcal', 'a riposo');
+    html += statistica('Fabbisogno', App.numero(r.fabbisogno, 0) + ' kcal', r.attivita_etichetta);
+    html += statistica('Calorie consigliate', App.numero(r.calorie_consigliate, 0) + ' kcal', 'per il tuo obiettivo');
     html += '</div>';
+    html += '<p class="aiuto">' + App.testoSicuro(r.calorie_nota) + '</p>';
 
-    html += '<div class="campo"><label>Dove ti alleni</label><div class="scelte" id="scelte-luogo">';
-    for (const l of opzioni.luoghi) {
-      const check = l === luogo ? ' checked' : '';
-      html += '<label><input type="radio" name="luogo" value="' + App.testoSicuro(l) + '"' + check + '> ' + App.testoSicuro(etichetta(l)) + '</label>';
+    const t = r.target;
+    html += '<h3>Obiettivo realistico</h3>';
+    if (t.tipo === 'mantenimento') {
+      html += '<p>Peso da mantenere: <strong>' + App.numero(t.peso_obiettivo, 1) + ' kg</strong></p>';
+    } else {
+      const verbo = t.tipo === 'perdita' ? 'Da perdere' : 'Da mettere su';
+      html += '<p>Peso obiettivo: <strong>' + App.numero(t.peso_obiettivo, 1) + ' kg</strong> &middot; ' +
+        verbo + ': <strong>' + App.numero(t.differenza, 1) + ' kg</strong></p>';
+      if (t.ritmo) {
+        html += '<p>Ritmo consigliato: ' + App.numero(t.ritmo.min, 2) + ' - ' + App.numero(t.ritmo.max, 2) + ' kg a settimana.</p>';
+      }
+      if (t.stima) {
+        html += '<p>Data stimata: tra il <strong>' + App.dataIta(t.stima.data_min) + '</strong> e il <strong>' +
+          App.dataIta(t.stima.data_max) + '</strong>.</p>';
+      }
     }
-    html += '</div></div>';
-
-    html += '<div class="campo" id="blocco-attrezzatura"><label>Attrezzatura disponibile a casa</label><div class="scelte">';
-    for (const a of opzioni.attrezzatura_casa) {
-      if (a === 'nessuna') continue;
-      const check = attrezzatura.indexOf(a) !== -1 ? ' checked' : '';
-      html += '<label><input type="checkbox" name="attrezzatura" value="' + App.testoSicuro(a) + '"' + check + '> ' + App.testoSicuro(etichetta(a)) + '</label>';
+    if (t.nota) html += '<p class="aiuto">' + App.testoSicuro(t.nota) + '</p>';
+    for (const avviso of r.avvisi || []) {
+      html += '<div class="messaggio avviso">' + App.testoSicuro(avviso) + '</div>';
     }
-    html += '</div><p class="aiuto">Se non selezioni nulla, la scheda usera solo il peso del corpo.</p></div>';
-
-    html += '<div class="griglia-2">';
-    html += '<div class="campo"><label for="obiettivo">Obiettivo</label><select id="obiettivo" name="obiettivo">' +
-      opzioniSelect(opzioni.obiettivi, p.obiettivo || 'tonificare') + '</select></div>';
-    html += '<div class="campo"><label for="livello">Livello</label><select id="livello" name="livello">' +
-      opzioniSelect(opzioni.livelli, p.livello || 'principiante') + '</select></div>';
-    html += '<div class="campo"><label for="giorni_settimana">Giorni a settimana</label><select id="giorni_settimana" name="giorni_settimana">' +
-      opzioniSelect(giorni, String(p.giorni_settimana || 3)) + '</select></div>';
-    html += '<div class="campo"><label for="minuti_sessione">Minuti per sessione</label><select id="minuti_sessione" name="minuti_sessione">' +
-      opzioniSelect(minuti, String(p.minuti_sessione || 45)) + '</select></div>';
-    html += '</div>';
-
-    html += '<div class="campo"><label>Infortuni o zone da evitare</label><div class="scelte">';
-    for (const z of zone) {
-      const check = infortuniTesto.toLowerCase().indexOf(z) !== -1 ? ' checked' : '';
-      html += '<label><input type="checkbox" name="zona" value="' + App.testoSicuro(z) + '"' + check + '> ' + App.testoSicuro(z) + '</label>';
-    }
-    html += '</div>';
-    html += '<textarea id="infortuni-note" name="infortuni-note" maxlength="200" placeholder="Altro da segnalare (facoltativo)"></textarea>';
-    html += '<p class="aiuto">Gli esercizi che caricano le zone selezionate vengono sostituiti automaticamente.</p></div>';
-
-    html += '<button type="submit" id="salva-profilo">' + (profilo ? 'Salva modifiche' : 'Calcola e inizia') + '</button>';
-    html += '</form>';
     return html;
   }
 
-  // Dal testo salvato ricava la parte libera (quella che non sono i nomi delle zone).
-  function noteLibere(testo, zone) {
-    let resto = String(testo || '');
-    for (const z of zone) {
-      resto = resto.split(new RegExp(z, 'gi')).join('');
+  // --- Pezzi del questionario -------------------------------------------------
+
+  function scelteHtml(campo, valori, selezionato, conNote) {
+    let html = '<div class="scelte-card">';
+    for (const v of valori) {
+      const attivo = String(selezionato) === String(v);
+      html += '<button type="button" class="scelta" data-campo="' + campo + '" data-valore="' + App.testoSicuro(v) + '"' +
+        ' aria-pressed="' + attivo + '">';
+      if (ICONE[v]) html += '<span class="icona-scelta"><i data-lucide="' + ICONE[v] + '"></i></span>';
+      html += '<span>' + App.testoSicuro(etichetta(v));
+      if (conNote && NOTE[v]) html += '<small>' + App.testoSicuro(NOTE[v]) + '</small>';
+      html += '</span></button>';
     }
-    return resto.replace(/[,;.]+/g, ' ').replace(/\s+/g, ' ').trim();
+    html += '</div>';
+    return html;
   }
 
-  function leggiForm(form, zone) {
-    const zoneScelte = Array.prototype.slice
-      .call(form.querySelectorAll('input[name="zona"]:checked'))
-      .map(function (i) { return i.value; });
-    const note = form.querySelector('#infortuni-note').value.trim();
-    const infortuni = zoneScelte.concat(note ? [note] : []).join(', ');
+  function scelteMultipleHtml(campo, valori, selezionati) {
+    let html = '<div class="scelte-card">';
+    for (const v of valori) {
+      const attivo = selezionati.indexOf(v) !== -1;
+      html += '<button type="button" class="scelta" data-multi="' + campo + '" data-valore="' + App.testoSicuro(v) + '"' +
+        ' aria-pressed="' + attivo + '">';
+      if (ICONE[v]) html += '<span class="icona-scelta"><i data-lucide="' + ICONE[v] + '"></i></span>';
+      html += '<span>' + App.testoSicuro(etichetta(v)) + '</span></button>';
+    }
+    html += '</div>';
+    return html;
+  }
 
-    return {
-      peso: form.querySelector('#peso').value,
-      altezza: form.querySelector('#altezza').value,
-      eta: form.querySelector('#eta').value,
-      sesso: form.querySelector('#sesso').value,
-      luogo: (form.querySelector('input[name="luogo"]:checked') || {}).value,
-      attrezzatura: Array.prototype.slice
-        .call(form.querySelectorAll('input[name="attrezzatura"]:checked'))
-        .map(function (i) { return i.value; }),
-      obiettivo: form.querySelector('#obiettivo').value,
-      livello: form.querySelector('#livello').value,
-      giorni_settimana: form.querySelector('#giorni_settimana').value,
-      minuti_sessione: form.querySelector('#minuti_sessione').value,
-      infortuni: infortuni,
-      zone: zoneScelte,
+  function numeriHtml(campo, valori, selezionato, suffisso) {
+    let html = '<div class="scelte-card" style="grid-template-columns:repeat(auto-fit,minmax(74px,1fr))">';
+    for (const v of valori) {
+      const attivo = String(selezionato) === String(v);
+      html += '<button type="button" class="scelta" style="justify-content:center" data-campo="' + campo +
+        '" data-valore="' + v + '" aria-pressed="' + attivo + '"><span>' + v + (suffisso || '') + '</span></button>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function barraPassi() {
+    let html = '<div class="passi" role="progressbar" aria-valuemin="1" aria-valuemax="' + TOTALE_PASSI +
+      '" aria-valuenow="' + (passo + 1) + '">';
+    for (let i = 0; i < TOTALE_PASSI; i++) {
+      const classe = i < passo ? 'fatto' : (i === passo ? 'corrente' : '');
+      html += '<span class="' + classe + '"></span>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function contenutoPasso() {
+    const o = Stato.opzioni;
+    const giorni = [];
+    for (let i = o.giorni.min; i <= o.giorni.max; i++) giorni.push(i);
+    const minuti = [];
+    for (let m = o.minuti.min; m <= o.minuti.max; m += 15) minuti.push(m);
+
+    switch (passo) {
+      case 0:
+        return '<h2 class="passo-titolo">Partiamo da te</h2>' +
+          '<p class="aiuto">Servono per BMI, calorie e obiettivo realistico.</p>' +
+          '<div class="griglia-2" style="margin-top:var(--s-4)">' +
+          '<div class="campo"><label for="peso">Peso (kg)</label><input type="number" id="peso" inputmode="decimal" step="0.1" min="30" max="300" value="' + App.testoSicuro(bozza.peso) + '"></div>' +
+          '<div class="campo"><label for="altezza">Altezza (cm)</label><input type="number" id="altezza" inputmode="numeric" step="1" min="100" max="250" value="' + App.testoSicuro(bozza.altezza) + '"></div>' +
+          '<div class="campo"><label for="eta">Eta (anni)</label><input type="number" id="eta" inputmode="numeric" step="1" min="10" max="100" value="' + App.testoSicuro(bozza.eta) + '"></div>' +
+          '</div>' +
+          '<p class="etichetta">Sesso</p>' + scelteHtml('sesso', o.sessi, bozza.sesso, false);
+
+      case 1:
+        return '<h2 class="passo-titolo">Dove ti alleni</h2>' +
+          scelteHtml('luogo', o.luoghi, bozza.luogo, true) +
+          '<div id="blocco-attrezzatura" class="' + (bozza.luogo === 'casa' ? '' : 'nascosto') + '" style="margin-top:var(--s-4)">' +
+          '<p class="etichetta">Cosa hai a disposizione</p>' +
+          scelteMultipleHtml('attrezzatura', o.attrezzatura_casa.filter(function (a) { return a !== 'nessuna'; }), bozza.attrezzatura) +
+          '<p class="aiuto">Se non selezioni nulla, la scheda usa solo il peso del corpo.</p></div>';
+
+      case 2:
+        return '<h2 class="passo-titolo">Il tuo obiettivo</h2>' +
+          scelteHtml('obiettivo', o.obiettivi, bozza.obiettivo, true);
+
+      case 3:
+        return '<h2 class="passo-titolo">Quanto ti alleni</h2>' +
+          '<p class="etichetta">Livello</p>' + scelteHtml('livello', o.livelli, bozza.livello, true) +
+          '<p class="etichetta" style="margin-top:var(--s-4)">Giorni a settimana</p>' +
+          numeriHtml('giorni_settimana', giorni, bozza.giorni_settimana, '') +
+          '<p class="etichetta" style="margin-top:var(--s-4)">Minuti per sessione</p>' +
+          numeriHtml('minuti_sessione', minuti, bozza.minuti_sessione, '');
+
+      default:
+        return '<h2 class="passo-titolo">Infortuni o zone delicate</h2>' +
+          '<p class="aiuto">Gli esercizi che caricano queste zone vengono sostituiti automaticamente.</p>' +
+          scelteMultipleHtml('zone', o.zone_infortuni, bozza.zone) +
+          '<div class="campo" style="margin-top:var(--s-4)"><label for="note">Altro da segnalare</label>' +
+          '<textarea id="note" maxlength="200" placeholder="Facoltativo">' + App.testoSicuro(bozza.note) + '</textarea></div>' +
+          '<div class="messaggio info">In caso di dolore fermati e senti un medico: questa app non fa diagnosi.</div>';
+    }
+  }
+
+  // Controlla e memorizza i dati del passo prima di andare avanti.
+  function convalidaPasso() {
+    if (passo === 0) {
+      const peso = Number(document.getElementById('peso').value);
+      const altezza = Number(document.getElementById('altezza').value);
+      const eta = Number(document.getElementById('eta').value);
+      if (!(peso >= 30 && peso <= 300)) return 'Il peso deve essere tra 30 e 300 kg.';
+      if (!(altezza >= 100 && altezza <= 250)) return 'L altezza deve essere tra 100 e 250 cm.';
+      if (!(eta >= 10 && eta <= 100)) return 'L eta deve essere tra 10 e 100 anni.';
+      bozza.peso = peso;
+      bozza.altezza = altezza;
+      bozza.eta = eta;
+      if (eta < 18) App.toast('Hai meno di 18 anni: fatti seguire da un adulto e senti il medico.', 'avviso', 6000);
+    }
+    if (passo === 4) {
+      bozza.note = document.getElementById('note').value.trim();
+    }
+    return null;
+  }
+
+  async function salva(bottone) {
+    const dati = {
+      peso: bozza.peso,
+      altezza: bozza.altezza,
+      eta: bozza.eta,
+      sesso: bozza.sesso,
+      luogo: bozza.luogo,
+      attrezzatura: bozza.luogo === 'casa' ? bozza.attrezzatura : [],
+      obiettivo: bozza.obiettivo,
+      livello: bozza.livello,
+      giorni_settimana: bozza.giorni_settimana,
+      minuti_sessione: bozza.minuti_sessione,
+      infortuni: bozza.zone.concat(bozza.note ? [bozza.note] : []).join(', '),
     };
+    App.occupato(bottone, true, 'Calcolo...');
+    try {
+      const risposta = await App.api('POST', '/api/profilo', dati);
+      Stato.profilo = risposta.profilo;
+      Stato.riepilogo = risposta.riepilogo;
+      App.toast('Profilo salvato', 'ok');
+      bozza = null;
+      await App.ricarica();
+    } catch (err) {
+      App.occupato(bottone, false);
+      App.toast(err.message, 'errore');
+    }
+  }
+
+  function disegnaWizard(el) {
+    const primaVolta = !Stato.profilo;
+    el.innerHTML = '<div class="card">' + barraPassi() +
+      '<div id="corpo-passo">' + contenutoPasso() + '</div>' +
+      '<div class="riga-bottoni" style="margin-top:var(--s-5)">' +
+      (passo > 0 ? '<button type="button" class="btn-contorno" id="indietro"><i data-lucide="arrow-left"></i> Indietro</button>' : '') +
+      '<button type="button" class="btn-principale" id="avanti" style="flex:1">' +
+      (passo === TOTALE_PASSI - 1 ? '<i data-lucide="check"></i> Calcola e salva' : 'Avanti <i data-lucide="arrow-right"></i>') +
+      '</button>' +
+      (primaVolta ? '' : '<button type="button" class="btn-contorno" id="annulla">Annulla</button>') +
+      '</div><p class="aiuto">Passo ' + (passo + 1) + ' di ' + TOTALE_PASSI + '</p></div>';
+    App.icone();
+
+    el.querySelectorAll('[data-campo]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        const campo = b.dataset.campo;
+        const valore = b.dataset.valore;
+        bozza[campo] = /^\d+$/.test(valore) ? Number(valore) : valore;
+        el.querySelectorAll('[data-campo="' + campo + '"]').forEach(function (altro) {
+          altro.setAttribute('aria-pressed', String(altro === b));
+        });
+        if (campo === 'luogo') {
+          const blocco = document.getElementById('blocco-attrezzatura');
+          if (blocco) blocco.classList.toggle('nascosto', valore !== 'casa');
+        }
+        App.vibra(10);
+      });
+    });
+
+    el.querySelectorAll('[data-multi]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        const campo = b.dataset.multi;
+        const valore = b.dataset.valore;
+        const lista = bozza[campo];
+        const posizione = lista.indexOf(valore);
+        if (posizione === -1) lista.push(valore);
+        else lista.splice(posizione, 1);
+        b.setAttribute('aria-pressed', String(posizione === -1));
+        App.vibra(10);
+      });
+    });
+
+    const avanti = document.getElementById('avanti');
+    avanti.addEventListener('click', function () {
+      const errore = convalidaPasso();
+      if (errore) { App.toast(errore, 'errore'); App.vibra(60); return; }
+      if (passo === TOTALE_PASSI - 1) { salva(avanti); return; }
+      passo++;
+      disegnaWizard(el);
+    });
+
+    const indietro = document.getElementById('indietro');
+    if (indietro) {
+      indietro.addEventListener('click', function () {
+        convalidaPasso();
+        passo--;
+        disegnaWizard(el);
+      });
+    }
+
+    const annulla = document.getElementById('annulla');
+    if (annulla) {
+      annulla.addEventListener('click', function () { bozza = null; App.ricarica(); });
+    }
+  }
+
+  function dettagliProfilo(p) {
+    const zone = String(p.infortuni || '').trim();
+    let html = '<div class="statistiche">';
+    html += statistica('Obiettivo', etichetta(p.obiettivo), etichetta(p.livello));
+    html += statistica('Allenamenti', p.giorni_settimana + ' a settimana', p.minuti_sessione + ' minuti');
+    html += statistica('Dove', etichetta(p.luogo), (p.attrezzatura || []).map(etichetta).join(', ') || 'solo corpo libero');
+    html += statistica('Corpo', App.numero(p.peso, 1) + ' kg', p.altezza + ' cm, ' + p.eta + ' anni');
+    html += '</div>';
+    if (zone) html += '<p class="aiuto">Zone da rispettare: ' + App.testoSicuro(zone) + '</p>';
+    return html;
   }
 
   Viste.profilo = {
@@ -189,54 +315,44 @@
 
     async mostra(el) {
       if (!Stato.opzioni) await App.ricaricaProfilo();
-      const opzioni = Stato.opzioni;
-      const zone = opzioni.zone_infortuni || [];
-      const primaVolta = !Stato.profilo;
 
-      let html = '<div class="card">';
-      html += '<h2>' + (primaVolta ? 'Iniziamo: parlami di te' : 'Il tuo profilo') + '</h2>';
-      if (primaVolta) {
-        html += '<p class="aiuto">Servono per calcolare BMI, calorie e per costruire la scheda. Puoi cambiarli quando vuoi.</p>';
+      // Senza profilo si parte subito dal questionario.
+      if (!Stato.profilo && !bozza) {
+        bozza = {
+          peso: '', altezza: '', eta: '', sesso: 'uomo', luogo: 'casa', attrezzatura: [],
+          obiettivo: 'tonificare', livello: 'principiante', giorni_settimana: 3,
+          minuti_sessione: 45, zone: [], note: '',
+        };
+        passo = 0;
       }
-      html += '<div id="esito-profilo" class="messaggio nascosto"></div>';
-      html += formHtml(Stato.profilo, opzioni);
-      html += '</div>';
-      html += '<div class="card' + (Stato.riepilogo ? '' : ' nascosto') + '" id="card-riepilogo"><h2>I tuoi numeri</h2>' +
-        '<div id="riepilogo">' + riepilogoHtml(Stato.riepilogo) + '</div></div>';
+      if (bozza) { disegnaWizard(el); return; }
+
+      const p = Stato.profilo;
+      let html = '<div class="card card-accento"><div class="card-testa"><h2>Il tuo profilo</h2>' +
+        '<button type="button" class="btn-contorno btn-piccolo" id="modifica"><i data-lucide="pencil"></i> Modifica</button></div>' +
+        dettagliProfilo(p) + '</div>';
+      html += '<div class="card"><h2>I tuoi numeri</h2>' + riepilogoHtml(Stato.riepilogo) + '</div>';
+      html += '<div class="card"><div class="card-testa"><h2>Aspetto</h2>' +
+        '<button type="button" class="btn-contorno btn-piccolo" data-tema-toggle></button></div>' +
+        '<p class="aiuto">Il tema scelto resta salvato su questo dispositivo.</p></div>';
       el.innerHTML = html;
+      App.collegaTema();
+      App.icone();
 
-      const form = document.getElementById('form-profilo');
-      const esito = document.getElementById('esito-profilo');
-      const bottone = document.getElementById('salva-profilo');
-      form.querySelector('#infortuni-note').value = noteLibere(Stato.profilo && Stato.profilo.infortuni, zone);
-
-      function aggiornaAttrezzatura() {
-        const scelto = (form.querySelector('input[name="luogo"]:checked') || {}).value;
-        document.getElementById('blocco-attrezzatura').classList.toggle('nascosto', scelto !== 'casa');
-      }
-      form.querySelectorAll('input[name="luogo"]').forEach(function (r) {
-        r.addEventListener('change', aggiornaAttrezzatura);
-      });
-      aggiornaAttrezzatura();
-
-      form.addEventListener('submit', async function (evento) {
-        evento.preventDefault();
-        App.pulisci(esito);
-        App.occupato(bottone, true, 'Salvo...');
-        try {
-          const dati = leggiForm(form, zone);
-          const risposta = await App.api('POST', '/api/profilo', dati);
-          Stato.profilo = risposta.profilo;
-          Stato.riepilogo = risposta.riepilogo;
-          document.getElementById('riepilogo').innerHTML = riepilogoHtml(risposta.riepilogo);
-          document.getElementById('card-riepilogo').classList.remove('nascosto');
-          App.occupato(bottone, false);
-          App.mostra(esito, primaVolta ? 'Profilo creato: guarda i tuoi numeri qui sotto.' : 'Profilo aggiornato.', 'ok');
-          document.getElementById('card-riepilogo').scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } catch (err) {
-          App.occupato(bottone, false);
-          App.mostra(esito, err.message, 'errore');
-        }
+      document.getElementById('modifica').addEventListener('click', function () {
+        const zone = (Stato.opzioni.zone_infortuni || []).filter(function (z) {
+          return String(p.infortuni || '').toLowerCase().indexOf(z) !== -1;
+        });
+        let note = String(p.infortuni || '');
+        for (const z of zone) note = note.split(new RegExp(z, 'gi')).join('');
+        bozza = {
+          peso: p.peso, altezza: p.altezza, eta: p.eta, sesso: p.sesso, luogo: p.luogo,
+          attrezzatura: (p.attrezzatura || []).slice(), obiettivo: p.obiettivo, livello: p.livello,
+          giorni_settimana: p.giorni_settimana, minuti_sessione: p.minuti_sessione,
+          zone: zone, note: note.replace(/[,;.]+/g, ' ').replace(/\s+/g, ' ').trim(),
+        };
+        passo = 0;
+        disegnaWizard(el);
       });
     },
   };

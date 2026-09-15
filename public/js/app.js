@@ -1,11 +1,10 @@
-/* Guscio dell applicazione: menu, router a hash e stato condiviso tra le viste. */
+/* Guscio dell applicazione: navigazione, stato condiviso e transizioni tra viste. */
 (function () {
   'use strict';
 
   const Viste = window.Viste || (window.Viste = {});
   const Stato = window.Stato || (window.Stato = {});
   const messaggio = document.getElementById('messaggio-globale');
-  const menu = document.getElementById('menu');
 
   const NOMI_VISTE = ['dashboard', 'allenamento', 'progressi', 'ai', 'profilo'];
 
@@ -14,11 +13,12 @@
   }
 
   function evidenziaMenu(nome) {
-    const voci = menu.querySelectorAll('a[data-vista]');
-    for (const voce of voci) {
-      if (voce.dataset.vista === nome) voce.classList.add('attivo');
-      else voce.classList.remove('attivo');
-    }
+    document.querySelectorAll('[data-vista]').forEach(function (voce) {
+      const attivo = voce.dataset.vista === nome;
+      voce.classList.toggle('attivo', attivo);
+      if (attivo) voce.setAttribute('aria-current', 'page');
+      else voce.removeAttribute('aria-current');
+    });
   }
 
   function vistaCorrente() {
@@ -27,7 +27,7 @@
   }
 
   async function mostraVista(nome) {
-    // Senza profilo si passa per il questionario iniziale.
+    // Senza profilo si passa prima dal questionario iniziale.
     if (!Stato.profilo && nome !== 'profilo') {
       App.mostra(messaggio, 'Completa il profilo per iniziare: serve per creare la tua scheda.', 'info');
       window.location.hash = '#profilo';
@@ -44,18 +44,22 @@
     if (!el) return;
     const vista = Viste[nome];
     if (!vista || typeof vista.mostra !== 'function') {
-      el.innerHTML = '<div class="card"><h2>Sezione in arrivo</h2><p>Questa parte non e ancora disponibile.</p></div>';
+      el.innerHTML = '<div class="card"><h2>Sezione in arrivo</h2></div>';
       return;
     }
-    el.innerHTML = '<div class="card"><p><span class="caricamento"></span> Carico...</p></div>';
+
+    el.innerHTML = App.scheletro(3);
+    el.classList.remove('entra');
     try {
       await vista.mostra(el);
+      // Micro animazione di entrata, riavviata a ogni cambio pagina.
+      void el.offsetWidth;
+      el.classList.add('entra');
+      App.icone();
+      if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: App.animazioniRidotte() ? 'auto' : 'smooth' });
     } catch (err) {
-      el.innerHTML = '';
-      const avviso = document.createElement('div');
-      avviso.className = 'messaggio errore';
-      avviso.textContent = err.message || 'Errore durante il caricamento.';
-      el.appendChild(avviso);
+      el.innerHTML = '<div class="card"><div class="messaggio errore">' +
+        App.testoSicuro(err.message || 'Errore durante il caricamento.') + '</div></div>';
     }
   }
 
@@ -72,21 +76,27 @@
     if (vistaCorrente() === nome) mostraVista(nome);
     else window.location.hash = '#' + nome;
   };
-  App.ricarica = function () {
-    return mostraVista(vistaCorrente());
-  };
-  App.messaggioGlobale = function (testo, tipo) {
-    App.mostra(messaggio, testo, tipo || 'info');
-  };
+  App.ricarica = function () { return mostraVista(vistaCorrente()); };
+  App.messaggioGlobale = function (testo, tipo) { App.mostra(messaggio, testo, tipo || 'info'); };
 
-  document.getElementById('cambia-utente').addEventListener('click', async function () {
+  async function cambiaUtente() {
     try { await App.api('POST', '/api/auth/cambia-utente'); } catch (err) { /* ignora */ }
     window.location.href = '/utente';
-  });
+  }
 
-  document.getElementById('logout').addEventListener('click', async function () {
+  async function esci() {
     try { await App.api('POST', '/api/auth/logout'); } catch (err) { /* ignora */ }
     window.location.href = '/';
+  }
+
+  document.getElementById('cambia-utente').addEventListener('click', cambiaUtente);
+  document.getElementById('logout').addEventListener('click', esci);
+  document.getElementById('cambia-utente-lat').addEventListener('click', function (e) { e.preventDefault(); cambiaUtente(); });
+  document.getElementById('logout-lat').addEventListener('click', function (e) { e.preventDefault(); esci(); });
+
+  // Cambiando tema i grafici vanno ridisegnati con i nuovi colori.
+  window.addEventListener('tema-cambiato', function () {
+    if (Stato.utente && Stato.profilo) App.ricarica();
   });
 
   window.addEventListener('hashchange', function () {
@@ -103,10 +113,12 @@
       }
       Stato.utente = stato.utente;
       Stato.aiConfigurata = Boolean(stato.ai_configurata);
-      document.getElementById('nome-utente').textContent = stato.utente.nome;
+      document.getElementById('chip-utente').innerHTML =
+        App.avatarHtml(stato.utente.nome, 'piccolo') + '<span>' + App.testoSicuro(stato.utente.nome) + '</span>';
+
       await ricaricaProfilo();
       if (!Stato.profilo) {
-        App.mostra(messaggio, 'Benvenuto! Compila il profilo: da qui nascono scheda e calcoli.', 'info');
+        App.mostra(messaggio, 'Benvenuto! Bastano due minuti: rispondi alle domande e la scheda e pronta.', 'info');
         if (vistaCorrente() !== 'profilo') {
           window.location.hash = '#profilo';
           return;

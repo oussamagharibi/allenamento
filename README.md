@@ -49,6 +49,16 @@ Note: il filesystem di Railway viene ricreato a ogni deploy, quindi l'app non sc
 nulla su disco — tutti i dati (utenti, sessioni, allenamenti, report AI) stanno su PostgreSQL.
 In produzione la connessione usa SSL con `rejectUnauthorized: false`.
 
+## Interfaccia
+
+Tema scuro di default con interruttore chiaro/scuro (la scelta resta in un cookie,
+non in localStorage). Su telefono la navigazione e in basso con icone, su schermo
+grande c'e una barra laterale. L'app e installabile come PWA (`manifest.json`,
+icone in `public/icone`, service worker `public/sw.js` con strategia "prima la rete,
+la cache solo come riserva offline"). Le icone si rigenerano con
+`node scripts/genera-icone.js`. Le animazioni si disattivano da sole se il sistema
+richiede `prefers-reduced-motion`.
+
 ## Pannello di amministrazione
 
 Su `/admin`, protetto da `ADMIN_PASSWORD` (accesso separato da quello degli utenti,

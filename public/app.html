@@ -1,48 +1,91 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-tema="scuro">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0b0d10">
   <title>Allenamento</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icone/icona-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="/icone/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Allenamento">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap">
   <link rel="stylesheet" href="/css/style.css">
+  <script>
+    (function () {
+      var c = document.cookie.match(/(?:^|; )tema=([^;]*)/);
+      var t = c ? decodeURIComponent(c[1]) : 'scuro';
+      document.documentElement.setAttribute('data-tema', t === 'chiaro' ? 'chiaro' : 'scuro');
+      if (t === 'chiaro') document.querySelector('meta[name="theme-color"]').setAttribute('content', '#f4f6f8');
+    })();
+  </script>
 </head>
 <body>
-  <header class="testata">
-    <div class="testata-riga">
-      <span class="titolo">&#127947; Allenamento</span>
-      <span class="utente" id="nome-utente"></span>
-    </div>
-    <nav class="menu" id="menu">
-      <a href="#dashboard" data-vista="dashboard">Dashboard</a>
-      <a href="#allenamento" data-vista="allenamento">Allenamento</a>
-      <a href="#progressi" data-vista="progressi">Progressi</a>
-      <a href="#ai" data-vista="ai">Coach AI</a>
-      <a href="#profilo" data-vista="profilo">Profilo</a>
-      <button type="button" class="menu-azione" id="cambia-utente">Cambia utente</button>
-      <button type="button" class="menu-azione" id="logout">Logout</button>
+  <div class="guscio">
+    <!-- Desktop: barra laterale -->
+    <nav class="laterale" aria-label="Menu principale">
+      <span class="marchio"><i data-lucide="dumbbell"></i> Allenamento</span>
+      <a href="#dashboard" data-vista="dashboard"><i data-lucide="layout-dashboard"></i> Dashboard</a>
+      <a href="#allenamento" data-vista="allenamento"><i data-lucide="flame"></i> Allenamento</a>
+      <a href="#progressi" data-vista="progressi"><i data-lucide="trending-up"></i> Progressi</a>
+      <a href="#ai" data-vista="ai"><i data-lucide="sparkles"></i> Coach AI</a>
+      <a href="#profilo" data-vista="profilo"><i data-lucide="user-round"></i> Profilo</a>
+      <div class="in-fondo">
+        <a href="#" id="cambia-utente-lat"><i data-lucide="users-round"></i> Cambia utente</a>
+        <a href="#" id="logout-lat"><i data-lucide="log-out"></i> Logout</a>
+      </div>
     </nav>
-  </header>
 
-  <main class="contenitore">
-    <div id="messaggio-globale" class="messaggio nascosto"></div>
+    <div>
+      <header class="barra-alto">
+        <span class="marchio"><i data-lucide="dumbbell"></i> Allenamento</span>
+        <div class="azioni-alto">
+          <span class="chip-utente" id="chip-utente"></span>
+          <button type="button" class="btn-contorno btn-icona" data-tema-toggle></button>
+          <button type="button" class="btn-contorno btn-icona" id="cambia-utente" aria-label="Cambia utente" title="Cambia utente">
+            <i data-lucide="users-round"></i>
+          </button>
+          <button type="button" class="btn-contorno btn-icona" id="logout" aria-label="Logout" title="Logout">
+            <i data-lucide="log-out"></i>
+          </button>
+        </div>
+      </header>
 
-    <section class="vista nascosto" id="vista-dashboard"></section>
-    <section class="vista nascosto" id="vista-allenamento"></section>
-    <section class="vista nascosto" id="vista-progressi"></section>
-    <section class="vista nascosto" id="vista-ai"></section>
-    <section class="vista nascosto" id="vista-profilo"></section>
-  </main>
+      <main class="contenitore" id="principale">
+        <div id="messaggio-globale" class="messaggio nascosto"></div>
 
-  <footer>Non sostituisce il parere di un medico o personal trainer</footer>
+        <section class="vista nascosto" id="vista-dashboard"></section>
+        <section class="vista nascosto" id="vista-allenamento"></section>
+        <section class="vista nascosto" id="vista-progressi"></section>
+        <section class="vista nascosto" id="vista-ai"></section>
+        <section class="vista nascosto" id="vista-profilo"></section>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
-  <script src="/js/comune.js"></script>
-  <script src="/js/vista-profilo.js"></script>
-  <script src="/js/vista-allenamento.js"></script>
-  <script src="/js/vista-progressi.js"></script>
-  <script src="/js/vista-dashboard.js"></script>
-  <script src="/js/vista-ai.js"></script>
-  <script src="/js/app.js"></script>
+        <footer class="pie">Non sostituisce il parere di un medico o personal trainer</footer>
+      </main>
+    </div>
+  </div>
+
+  <!-- Mobile: navigazione in basso -->
+  <nav class="barra-basso" id="menu-basso" aria-label="Menu">
+    <a href="#dashboard" data-vista="dashboard"><i data-lucide="layout-dashboard"></i> Home</a>
+    <a href="#allenamento" data-vista="allenamento"><i data-lucide="flame"></i> Allena</a>
+    <a href="#progressi" data-vista="progressi"><i data-lucide="trending-up"></i> Progressi</a>
+    <a href="#ai" data-vista="ai"><i data-lucide="sparkles"></i> Coach</a>
+    <a href="#profilo" data-vista="profilo"><i data-lucide="user-round"></i> Profilo</a>
+  </nav>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
+  <script src="/js/comune.js" defer></script>
+  <script src="/js/vista-profilo.js" defer></script>
+  <script src="/js/vista-allenamento.js" defer></script>
+  <script src="/js/vista-progressi.js" defer></script>
+  <script src="/js/vista-dashboard.js" defer></script>
+  <script src="/js/vista-ai.js" defer></script>
+  <script src="/js/app.js" defer></script>
 </body>
 </html>

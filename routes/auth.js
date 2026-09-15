@@ -72,6 +72,25 @@ router.get('/posti', apiSito, async (req, res, next) => {
   }
 });
 
+// Profili gia esistenti, mostrati come avatar nella pagina di scelta.
+// Visibili solo a chi ha gia superato la password del sito.
+router.get('/utenti', apiSito, async (req, res, next) => {
+  try {
+    const righe = await db.tutte(
+      `SELECT id, name, last_login FROM users
+        ORDER BY last_login DESC NULLS LAST, created_at ASC`
+    );
+    res.json({
+      utenti: righe.map((u) => ({ id: u.id, nome: u.name, ultimo_accesso: u.last_login })),
+      totale: righe.length,
+      massimo: MAX_UTENTI,
+      liberi: Math.max(0, MAX_UTENTI - righe.length),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Pagina 1: password del sito.
 router.post('/sito', limiteLogin, (req, res) => {
   const attesa = process.env.SITE_PASSWORD;

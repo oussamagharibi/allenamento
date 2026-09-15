@@ -1,40 +1,77 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-tema="scuro">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow">
-  <title>Allenamento - Chi sei?</title>
+  <meta name="theme-color" content="#0b0d10">
+  <title>Chi si allena?</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icone/icona-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="/icone/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap">
   <link rel="stylesheet" href="/css/style.css">
+  <script>
+    (function () {
+      var c = document.cookie.match(/(?:^|; )tema=([^;]*)/);
+      var t = c ? decodeURIComponent(c[1]) : 'scuro';
+      document.documentElement.setAttribute('data-tema', t === 'chiaro' ? 'chiaro' : 'scuro');
+      if (t === 'chiaro') document.querySelector('meta[name="theme-color"]').setAttribute('content', '#f4f6f8');
+    })();
+  </script>
 </head>
 <body>
-  <main class="contenitore centrato">
-    <div class="marchio">
-      <div class="logo">&#128100;</div>
+  <div class="barra-alto">
+    <span class="marchio"><i data-lucide="dumbbell"></i> Allenamento</span>
+    <div class="azioni-alto">
+      <button type="button" class="btn-contorno btn-icona" data-tema-toggle></button>
+      <button type="button" class="btn-contorno btn-icona" id="logout" aria-label="Esci dal sito" title="Esci dal sito">
+        <i data-lucide="log-out"></i>
+      </button>
+    </div>
+  </div>
+
+  <main class="schermata">
+    <div style="text-align:center; margin-bottom:var(--s-5)">
       <h1>Chi si allena?</h1>
-      <p>Scrivi il tuo nome per entrare nel tuo profilo</p>
+      <p class="aiuto">Scegli il tuo profilo o creane uno nuovo.</p>
     </div>
 
+    <div id="messaggio" class="messaggio errore nascosto"></div>
+
     <div class="card">
-      <div id="messaggio" class="messaggio errore nascosto"></div>
-      <form id="form-utente" autocomplete="off">
-        <div class="campo">
-          <label for="nome">Nome</label>
-          <input type="text" id="nome" name="nome" required maxlength="30" autocomplete="off" autocapitalize="words">
-          <p class="aiuto">Se il nome esiste gia' entri nel profilo esistente, altrimenti ne viene creato uno nuovo.</p>
-        </div>
-        <button type="submit" id="invia">Continua</button>
-      </form>
+      <div id="griglia" class="griglia-avatar">
+        <div class="skeleton alto"></div>
+        <div class="skeleton alto"></div>
+        <div class="skeleton alto"></div>
+      </div>
       <p class="aiuto" id="posti"></p>
     </div>
 
-    <div class="riga-bottoni">
-      <button type="button" class="secondario" id="logout">Esci dal sito</button>
+    <div class="card nascosto" id="card-nuovo">
+      <h2>Nuovo profilo</h2>
+      <form id="form-utente" autocomplete="off">
+        <div class="campo">
+          <label for="nome">Come ti chiami?</label>
+          <input type="text" id="nome" name="nome" required maxlength="30" autocomplete="off" autocapitalize="words" placeholder="Il tuo nome">
+        </div>
+        <div class="riga-bottoni">
+          <button type="submit" id="invia" class="btn-principale" style="flex:1">
+            <i data-lucide="arrow-right"></i> Continua
+          </button>
+          <button type="button" class="btn-contorno" id="annulla-nuovo">Annulla</button>
+        </div>
+      </form>
     </div>
   </main>
 
-  <footer>Non sostituisce il parere di un medico o personal trainer</footer>
-  <script src="/js/comune.js"></script>
-  <script src="/js/utente.js"></script>
+  <footer class="pie">Non sostituisce il parere di un medico o personal trainer</footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
+  <script src="/js/comune.js" defer></script>
+  <script src="/js/utente.js" defer></script>
 </body>
 </html>

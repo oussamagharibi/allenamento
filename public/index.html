@@ -1,36 +1,66 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-tema="scuro">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow">
-  <title>Allenamento - Accesso</title>
+  <meta name="theme-color" content="#0b0d10">
+  <meta name="description" content="Schede di allenamento personalizzate, progressi e coach AI.">
+  <title>Allenamento</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icone/icona-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="/icone/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Allenamento">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap">
   <link rel="stylesheet" href="/css/style.css">
+  <script>
+    // Tema applicato prima del disegno, per non far lampeggiare la pagina.
+    (function () {
+      var c = document.cookie.match(/(?:^|; )tema=([^;]*)/);
+      var t = c ? decodeURIComponent(c[1]) : 'scuro';
+      document.documentElement.setAttribute('data-tema', t === 'chiaro' ? 'chiaro' : 'scuro');
+      if (t === 'chiaro') document.querySelector('meta[name="theme-color"]').setAttribute('content', '#f4f6f8');
+    })();
+  </script>
 </head>
 <body>
-  <main class="contenitore centrato">
-    <div class="marchio">
-      <div class="logo">&#127947;</div>
-      <h1>Allenamento</h1>
-      <p>Schede, progressi e coach AI</p>
+  <div class="barra-alto">
+    <span class="marchio"><i data-lucide="dumbbell"></i> Allenamento</span>
+    <div class="azioni-alto">
+      <button type="button" class="btn-contorno btn-icona" data-tema-toggle></button>
+    </div>
+  </div>
+
+  <main class="schermata">
+    <div style="text-align:center; margin-bottom:var(--s-5)">
+      <img src="/icone/icona-192.png" alt="" width="76" height="76" style="border-radius:22px; box-shadow:var(--ombra-2)">
+      <h1 style="margin-top:var(--s-4)">Pronto ad allenarti?</h1>
+      <p class="aiuto">Schede su misura, progressi sempre sotto controllo e un coach AI che ti segue.</p>
     </div>
 
-    <div class="card">
-      <h2>Password del sito</h2>
+    <div class="card card-accento">
+      <h2>Entra</h2>
       <div id="messaggio" class="messaggio errore nascosto"></div>
       <form id="form-sito" autocomplete="off">
         <div class="campo">
-          <label for="password">Password</label>
-          <input type="password" id="password" name="password" required autocomplete="current-password">
+          <label for="password">Password del sito</label>
+          <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="La password condivisa">
         </div>
-        <button type="submit" id="invia">Entra</button>
+        <button type="submit" id="invia" class="btn-principale btn-blocco btn-grande">
+          <i data-lucide="log-in"></i> Entra
+        </button>
       </form>
-      <p class="aiuto">Dopo 5 tentativi sbagliati l'accesso si blocca per 15 minuti.</p>
+      <p class="aiuto">Dopo 5 tentativi sbagliati l accesso si blocca per 15 minuti.</p>
     </div>
   </main>
 
-  <footer>Non sostituisce il parere di un medico o personal trainer</footer>
-  <script src="/js/comune.js"></script>
-  <script src="/js/accesso.js"></script>
+  <footer class="pie">Non sostituisce il parere di un medico o personal trainer</footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
+  <script src="/js/comune.js" defer></script>
+  <script src="/js/accesso.js" defer></script>
 </body>
 </html>

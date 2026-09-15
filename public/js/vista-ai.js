@@ -1,4 +1,4 @@
-/* Vista Coach AI: analisi, generazione scheda con anteprima, chat e storico. */
+/* Vista Coach AI: analisi, scheda con anteprima, chat a bolle con indicatore di scrittura. */
 (function () {
   'use strict';
 
@@ -7,7 +7,7 @@
   let schedaProposta = null;
   let conversazione = [];
 
-  // Markdown minimo: il testo viene prima messo in sicurezza, poi si convertono
+  // Markdown ridotto: il testo viene prima messo in sicurezza, poi si convertono
   // solo titoli, elenchi e grassetto.
   function markdown(testo) {
     const righe = App.testoSicuro(testo).split(/\r?\n/);
@@ -65,78 +65,80 @@
   }
 
   function storicoHtml(report) {
-    if (!report.length) return '<p class="aiuto">Nessuna analisi salvata per ora.</p>';
+    const analisi = (report || []).filter(function (r) { return r.tipo === 'analisi'; });
+    if (!analisi.length) return '<p class="aiuto">Nessuna analisi salvata per ora.</p>';
     let html = '';
-    for (const r of report) {
-      if (r.tipo !== 'analisi') continue;
+    for (const r of analisi) {
       html += '<details class="report"><summary>Analisi del ' + dataOra(r.created_at) + '</summary>' +
         '<div class="testo-ai">' + markdown(r.contenuto) + '</div></details>';
     }
-    return html || '<p class="aiuto">Nessuna analisi salvata per ora.</p>';
+    return html;
   }
 
   function aggiornaContatore(restanti, limite) {
     const el = document.getElementById('contatore-ai');
     if (!el) return;
-    el.textContent = 'Richieste AI rimaste oggi: ' + restanti + ' su ' + limite + '.';
+    el.innerHTML = '<i data-lucide="battery-medium"></i> ' + restanti + ' richieste rimaste oggi su ' + limite;
+    el.className = 'tag ' + (restanti > 2 ? 'verde' : 'acceso');
+    App.icone();
   }
 
   Viste.ai = {
     async mostra(el) {
       const stato = await App.api('GET', '/api/ai/stato');
 
-      let html = '<div class="card"><h2>Coach AI</h2>';
       if (!stato.configurata) {
-        html += '<div class="messaggio avviso">AI non configurata</div>';
-        html += '<p class="aiuto">Manca la chiave ANTHROPIC_API_KEY sul server. Il resto ' +
-          'dell applicazione funziona normalmente: schede, allenamenti e progressi.</p></div>';
-        el.innerHTML = html;
+        el.innerHTML = '<div class="card"><div class="card-testa"><h2>Coach AI</h2>' +
+          '<i data-lucide="sparkles" style="color:var(--accento)"></i></div>' +
+          '<div class="messaggio avviso">AI non configurata</div>' +
+          '<p class="aiuto">Sul server manca la chiave ANTHROPIC_API_KEY. Tutto il resto ' +
+          '(schede, allenamenti, progressi) funziona normalmente.</p></div>';
+        App.icone();
         return;
       }
 
-      html += '<p class="aiuto" id="contatore-ai"></p>';
-      html += '<div id="esito-ai" class="messaggio nascosto"></div>';
-      html += '<div class="riga-bottoni">';
-      html += '<button type="button" id="btn-analisi">Analizza i miei progressi</button>';
-      html += '<button type="button" class="secondario" id="btn-scheda">Genera scheda con AI</button>';
-      html += '</div>';
-      html += '<div id="risultato-ai"></div>';
-      html += '</div>';
+      let html = '<div class="card card-accento"><div class="card-testa">' +
+        '<h2><i data-lucide="sparkles"></i> Coach AI</h2><span class="tag" id="contatore-ai"></span></div>';
+      html += '<div class="riga-bottoni">' +
+        '<button type="button" class="btn-principale" id="btn-analisi" style="flex:1"><i data-lucide="line-chart"></i> Analizza i miei progressi</button>' +
+        '<button type="button" class="btn-contorno" id="btn-scheda" style="flex:1"><i data-lucide="wand-sparkles"></i> Genera scheda con AI</button>' +
+        '</div><div id="risultato-ai"></div></div>';
 
-      html += '<div class="card"><h2>Fai una domanda</h2>';
-      html += '<div id="chat"></div>';
-      html += '<form id="form-chat" autocomplete="off"><div class="campo">';
-      html += '<textarea id="domanda" maxlength="600" placeholder="Es: come posso migliorare lo squat?"></textarea>';
-      html += '</div><button type="submit" id="btn-chat">Invia</button></form></div>';
+      html += '<div class="card"><h2>Fai una domanda</h2>' +
+        '<div class="chat" id="chat" aria-live="polite"></div>' +
+        '<form id="form-chat" autocomplete="off" style="margin-top:var(--s-3)"><div class="campo">' +
+        '<textarea id="domanda" maxlength="600" placeholder="Es: come miglioro lo squat senza far male alle ginocchia?"></textarea>' +
+        '</div><button type="submit" id="btn-chat" class="btn-principale btn-blocco"><i data-lucide="send"></i> Invia</button></form></div>';
 
       html += '<div class="card"><h2>Storico analisi</h2><div id="storico-ai"></div></div>';
       el.innerHTML = html;
-
+      App.icone();
       aggiornaContatore(stato.restanti, stato.limite);
 
-      const esito = document.getElementById('esito-ai');
       const risultato = document.getElementById('risultato-ai');
       const chat = document.getElementById('chat');
 
       async function ricaricaStorico() {
         const dati = await App.api('GET', '/api/ai/storico');
-        document.getElementById('storico-ai').innerHTML = storicoHtml(dati.report || []);
+        document.getElementById('storico-ai').innerHTML = storicoHtml(dati.report);
       }
       await ricaricaStorico();
 
       // --- Analisi ---
       const btnAnalisi = document.getElementById('btn-analisi');
       btnAnalisi.addEventListener('click', async function () {
-        App.pulisci(esito);
         App.occupato(btnAnalisi, true, 'Analizzo...');
+        risultato.innerHTML = App.scheletro(4);
         try {
           const dati = await App.api('POST', '/api/ai/analisi', {});
           risultato.innerHTML = '<div class="testo-ai">' + markdown(dati.report.contenuto) + '</div>';
           aggiornaContatore(dati.restanti, stato.limite);
-          if (dati.troncata) App.mostra(esito, 'Risposta interrotta per lunghezza: chiedi un dettaglio alla volta.', 'avviso');
+          if (dati.troncata) App.toast('Risposta interrotta per lunghezza: chiedi un dettaglio alla volta.', 'avviso');
+          else App.toast('Analisi pronta', 'ok');
           await ricaricaStorico();
         } catch (err) {
-          App.mostra(esito, err.message, 'errore');
+          risultato.innerHTML = '';
+          App.toast(err.message, 'errore');
           if (err.dati && err.dati.restanti !== undefined) aggiornaContatore(err.dati.restanti, stato.limite);
         } finally {
           App.occupato(btnAnalisi, false);
@@ -146,8 +148,8 @@
       // --- Scheda con anteprima ---
       const btnScheda = document.getElementById('btn-scheda');
       btnScheda.addEventListener('click', async function () {
-        App.pulisci(esito);
         App.occupato(btnScheda, true, 'Preparo...');
+        risultato.innerHTML = App.scheletro(5);
         try {
           const dati = await App.api('POST', '/api/ai/scheda', {});
           schedaProposta = dati.scheda;
@@ -156,16 +158,17 @@
             anteprima += '<div class="messaggio avviso">' + App.testoSicuro(dati.avvisi.join(' ')) + '</div>';
           }
           anteprima += schedaHtml(dati.scheda);
-          anteprima += '<div class="riga-bottoni">' +
-            '<button type="button" id="btn-accetta">Accetta scheda</button>' +
-            '<button type="button" class="secondario" id="btn-scarta">Scarta</button></div>';
+          anteprima += '<div class="riga-bottoni" style="margin-top:var(--s-3)">' +
+            '<button type="button" class="btn-lime" id="btn-accetta" style="flex:1"><i data-lucide="check"></i> Accetta</button>' +
+            '<button type="button" class="btn-contorno" id="btn-scarta">Scarta</button></div>';
           risultato.innerHTML = anteprima;
+          App.icone();
           aggiornaContatore(dati.restanti, stato.limite);
 
           document.getElementById('btn-scarta').addEventListener('click', function () {
             schedaProposta = null;
             risultato.innerHTML = '';
-            App.mostra(esito, 'Anteprima scartata: la tua scheda non e cambiata.', 'info');
+            App.toast('Anteprima scartata: la scheda non e cambiata', 'info');
           });
 
           document.getElementById('btn-accetta').addEventListener('click', async function () {
@@ -175,14 +178,15 @@
               await App.api('POST', '/api/ai/scheda/accetta', { scheda: schedaProposta });
               schedaProposta = null;
               risultato.innerHTML = '';
-              App.mostra(esito, 'Scheda salvata: la trovi nella sezione Allenamento.', 'ok');
+              App.toast('Scheda salvata: la trovi in Allenamento', 'ok');
             } catch (err) {
               App.occupato(bottone, false);
-              App.mostra(esito, err.message, 'errore');
+              App.toast(err.message, 'errore');
             }
           });
         } catch (err) {
-          App.mostra(esito, err.message, 'errore');
+          risultato.innerHTML = '';
+          App.toast(err.message, 'errore');
           if (err.dati && err.dati.restanti !== undefined) aggiornaContatore(err.dati.restanti, stato.limite);
         } finally {
           App.occupato(btnScheda, false);
@@ -194,40 +198,43 @@
       const btnChat = document.getElementById('btn-chat');
       const campoDomanda = document.getElementById('domanda');
 
-      function disegnaChat() {
+      function disegnaChat(scrivendo) {
         let html = '';
         for (const m of conversazione) {
           html += '<div class="bolla ' + (m.ruolo === 'assistant' ? 'coach' : 'io') + '">' +
             (m.ruolo === 'assistant' ? markdown(m.testo) : '<p>' + App.testoSicuro(m.testo) + '</p>') + '</div>';
         }
+        if (scrivendo) {
+          html += '<div class="bolla coach sta-scrivendo" aria-label="Il coach sta scrivendo">' +
+            '<i></i><i></i><i></i></div>';
+        }
         chat.innerHTML = html;
         chat.scrollTop = chat.scrollHeight;
       }
-      disegnaChat();
+      disegnaChat(false);
 
       formChat.addEventListener('submit', async function (evento) {
         evento.preventDefault();
         const domanda = campoDomanda.value.trim();
         if (domanda.length < 3) {
-          App.mostra(esito, 'Scrivi una domanda un po piu lunga.', 'errore');
+          App.toast('Scrivi una domanda un po piu lunga', 'errore');
           return;
         }
-        App.pulisci(esito);
         App.occupato(btnChat, true, 'Penso...');
         const storico = conversazione.slice(-6);
         conversazione.push({ ruolo: 'user', testo: domanda });
-        disegnaChat();
         campoDomanda.value = '';
+        disegnaChat(true);
         try {
           const dati = await App.api('POST', '/api/ai/chat', { domanda: domanda, storico: storico });
           conversazione.push({ ruolo: 'assistant', testo: dati.risposta });
-          disegnaChat();
+          disegnaChat(false);
           aggiornaContatore(dati.restanti, stato.limite);
         } catch (err) {
           conversazione.pop();
-          disegnaChat();
+          disegnaChat(false);
           campoDomanda.value = domanda;
-          App.mostra(esito, err.message, 'errore');
+          App.toast(err.message, 'errore');
           if (err.dati && err.dati.restanti !== undefined) aggiornaContatore(err.dati.restanti, stato.limite);
         } finally {
           App.occupato(btnChat, false);

@@ -12,6 +12,13 @@
 
   let utenti = [];
 
+  function mostraPannello(attivo, scadenza) {
+    vistaLogin.classList.toggle('nascosto', attivo);
+    vistaPannello.classList.toggle('nascosto', !attivo);
+    statoAdmin.textContent = attivo ? 'sessione attiva (' + scadenza + ' min)' : 'non collegato';
+    statoAdmin.className = 'tag ' + (attivo ? 'verde' : '');
+  }
+
   // Se la sessione admin scade il server risponde 403: si torna alla schermata di accesso.
   async function api(metodo, percorso, corpo) {
     try {
@@ -19,7 +26,7 @@
     } catch (err) {
       if (err.stato === 403) {
         mostraPannello(false, 30);
-        App.mostra(messaggio, 'Sessione admin scaduta: rientra con la master password.', 'avviso');
+        App.toast('Sessione admin scaduta: rientra con la master password', 'avviso');
       }
       throw err;
     }
@@ -33,39 +40,41 @@
       ' ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
   }
 
-  // --- Disegno ---------------------------------------------------------------
+  // --- Disegno ----------------------------------------------------------------
 
   function utenteHtml(u) {
     let html = '<div class="esercizio" data-utente="' + u.id + '">';
-    html += '<div class="esercizio-testa"><div><strong>' + App.testoSicuro(u.name) + '</strong>';
-    html += '<span class="tag">' + (u.profilo ? 'profilo ok' : 'senza profilo') + '</span></div>';
-    html += '<span class="prescrizione">' + u.sessioni + ' sessioni</span></div>';
-
-    html += '<p class="aiuto">Creato il ' + dataOra(u.created_at) +
-      ' &middot; ultimo accesso ' + dataOra(u.last_login) + '</p>';
-    html += '<p class="aiuto">' + u.allenamenti + ' allenamenti (' + u.completati + ' completati) &middot; ' +
-      u.pesate + ' pesate &middot; richieste AI oggi: ' + u.ai_oggi + '</p>';
-
-    html += '<div class="riga-bottoni">';
-    html += '<a class="bottone secondario piccolo" href="/api/admin/utenti/' + u.id + '/export">Esporta JSON</a>';
-    html += '<button type="button" class="piccolo secondario" data-azione="rinomina">Rinomina</button>';
-    html += '<button type="button" class="piccolo secondario" data-azione="azzera-ai">Azzera AI</button>';
-    html += '<button type="button" class="piccolo secondario" data-azione="sessioni">Termina sessioni</button>';
-    html += '<button type="button" class="piccolo secondario" data-azione="reset">Azzera dati</button>';
-    html += '<button type="button" class="piccolo secondario" data-azione="elimina">Elimina</button>';
+    html += '<div class="esercizio-testa">';
+    html += '<div style="display:flex; align-items:center; gap:var(--s-3)">' + App.avatarHtml(u.name, 'piccolo') +
+      '<div><strong>' + App.testoSicuro(u.name) + '</strong><br>' +
+      '<span class="tag ' + (u.profilo ? 'verde' : '') + '">' + (u.profilo ? 'profilo completo' : 'senza profilo') + '</span></div></div>';
+    html += '<span class="prescrizione">' + u.sessioni + (u.sessioni === 1 ? ' sessione' : ' sessioni') + '</span>';
     html += '</div>';
-    html += '<div class="conferma nascosto" data-conferma></div>';
+
+    html += '<p class="aiuto">Creato ' + dataOra(u.created_at) + ' &middot; ultimo accesso ' + dataOra(u.last_login) + '</p>';
+    html += '<p class="aiuto">' + u.allenamenti + ' allenamenti (' + u.completati + ' completati) &middot; ' +
+      u.pesate + ' pesate &middot; AI oggi: ' + u.ai_oggi + '</p>';
+
+    html += '<div class="riga-bottoni" style="margin-top:var(--s-3)">';
+    html += '<a class="btn btn-contorno btn-piccolo" href="/api/admin/utenti/' + u.id + '/export"><i data-lucide="download"></i> Esporta</a>';
+    html += '<button type="button" class="btn-contorno btn-piccolo" data-azione="rinomina"><i data-lucide="pencil"></i> Rinomina</button>';
+    html += '<button type="button" class="btn-contorno btn-piccolo" data-azione="azzera-ai"><i data-lucide="sparkles"></i> Azzera AI</button>';
+    html += '<button type="button" class="btn-contorno btn-piccolo" data-azione="sessioni"><i data-lucide="log-out"></i> Sessioni</button>';
+    html += '<button type="button" class="btn-pericolo btn-piccolo" data-azione="reset"><i data-lucide="eraser"></i> Azzera dati</button>';
+    html += '<button type="button" class="btn-pericolo btn-piccolo" data-azione="elimina"><i data-lucide="trash-2"></i> Elimina</button>';
+    html += '</div>';
+    html += '<div class="nascosto" data-conferma style="margin-top:var(--s-3)"></div>';
     html += '</div>';
     return html;
   }
 
   function disegnaUtenti(dati) {
     utenti = dati.utenti;
-    document.getElementById('riepilogo-utenti').textContent =
-      dati.totale + ' utenti su ' + dati.massimo + ' posti (limite AI: ' + dati.limite_ai + ' richieste al giorno).';
+    document.getElementById('riepilogo-utenti').textContent = dati.totale + ' / ' + dati.massimo + ' posti';
     elencoUtenti.innerHTML = utenti.length
       ? utenti.map(utenteHtml).join('')
       : '<p class="aiuto">Nessun utente registrato.</p>';
+    App.icone();
   }
 
   function disegnaBackup(lista) {
@@ -75,15 +84,15 @@
     }
     let html = '<ul class="elenco">';
     for (const b of lista) {
-      html += '<li><div class="riga-elenco">';
-      html += '<span>' + dataOra(b.created_at) + '</span>';
-      html += '<span class="titolo-seduta">' + App.testoSicuro(b.user_name) + ' &middot; ' +
-        b.allenamenti + ' allenamenti, ' + b.pesate + ' pesate' + (b.profilo ? ', profilo' : '') + '</span>';
-      html += '<button type="button" class="piccolo secondario" data-ripristina="' + b.id + '">Ripristina</button>';
-      html += '</div></li>';
+      html += '<li><div class="riga-elenco">' +
+        '<span>' + dataOra(b.created_at) + '</span>' +
+        '<span class="titolo-seduta">' + App.testoSicuro(b.user_name) + ' &middot; ' +
+        b.allenamenti + ' allenamenti, ' + b.pesate + ' pesate' + (b.profilo ? ', profilo' : '') + '</span>' +
+        '<button type="button" class="btn-contorno btn-piccolo" data-ripristina="' + b.id + '">' +
+        '<i data-lucide="rotate-ccw"></i> Ripristina</button></div></li>';
     }
-    html += '</ul>';
-    elencoBackup.innerHTML = html;
+    elencoBackup.innerHTML = html + '</ul>';
+    App.icone();
   }
 
   function disegnaLog(lista) {
@@ -93,14 +102,12 @@
     }
     let html = '<ul class="elenco">';
     for (const r of lista) {
-      html += '<li><div class="riga-elenco">';
-      html += '<span>' + dataOra(r.created_at) + '</span>';
-      html += '<span class="titolo-seduta">' + App.testoSicuro(r.azione) +
-        (r.target ? ' &middot; ' + App.testoSicuro(r.target) : '') + '</span>';
-      html += '</div></li>';
+      html += '<li><div class="riga-elenco">' +
+        '<span>' + dataOra(r.created_at) + '</span>' +
+        '<span class="titolo-seduta">' + App.testoSicuro(r.azione) +
+        (r.target ? ' &middot; ' + App.testoSicuro(r.target) : '') + '</span></div></li>';
     }
-    html += '</ul>';
-    elencoLog.innerHTML = html;
+    elencoLog.innerHTML = html + '</ul>';
   }
 
   async function ricarica() {
@@ -114,13 +121,7 @@
     disegnaLog(l.log);
   }
 
-  function mostraPannello(attivo, scadenza) {
-    vistaLogin.classList.toggle('nascosto', attivo);
-    vistaPannello.classList.toggle('nascosto', !attivo);
-    statoAdmin.textContent = attivo ? 'admin (' + scadenza + ' min)' : 'non collegato';
-  }
-
-  // --- Azioni ----------------------------------------------------------------
+  // --- Azioni -----------------------------------------------------------------
 
   // Reset ed eliminazione chiedono di riscrivere il nome, anche lato server.
   function chiediConferma(blocco, utente, testo, etichetta, esegui) {
@@ -131,8 +132,8 @@
       '<div class="campo"><label>Scrivi <strong>' + App.testoSicuro(utente.name) + '</strong> per confermare</label>' +
       '<input type="text" class="campo-conferma" autocomplete="off"></div>' +
       '<div class="riga-bottoni">' +
-      '<button type="button" class="piccolo" data-conferma-ok>' + etichetta + '</button>' +
-      '<button type="button" class="piccolo secondario" data-conferma-no>Annulla</button></div>';
+      '<button type="button" class="btn-pericolo btn-piccolo" data-conferma-ok>' + etichetta + '</button>' +
+      '<button type="button" class="btn-contorno btn-piccolo" data-conferma-no>Annulla</button></div>';
 
     const campo = area.querySelector('.campo-conferma');
     campo.focus();
@@ -145,12 +146,10 @@
       App.occupato(bottone, true, 'Eseguo...');
       try {
         await esegui(campo.value);
-        area.classList.add('nascosto');
-        area.innerHTML = '';
         await ricarica();
       } catch (err) {
         App.occupato(bottone, false);
-        App.mostra(messaggio, err.message, 'errore');
+        App.toast(err.message, 'errore');
       }
     });
   }
@@ -161,8 +160,8 @@
     area.innerHTML =
       '<div class="campo"><label>Nuovo nome</label>' +
       '<input type="text" class="campo-conferma" maxlength="30" value="' + App.testoSicuro(utente.name) + '"></div>' +
-      '<div class="riga-bottoni"><button type="button" class="piccolo" data-conferma-ok>Salva</button>' +
-      '<button type="button" class="piccolo secondario" data-conferma-no>Annulla</button></div>';
+      '<div class="riga-bottoni"><button type="button" class="btn-principale btn-piccolo" data-conferma-ok>Salva</button>' +
+      '<button type="button" class="btn-contorno btn-piccolo" data-conferma-no>Annulla</button></div>';
 
     const campo = area.querySelector('.campo-conferma');
     campo.focus();
@@ -175,13 +174,11 @@
       App.occupato(bottone, true, 'Salvo...');
       try {
         await api('POST', '/api/admin/utenti/' + utente.id + '/rinomina', { nome: campo.value });
-        area.classList.add('nascosto');
-        area.innerHTML = '';
-        App.mostra(messaggio, 'Utente rinominato.', 'ok');
+        App.toast('Utente rinominato', 'ok');
         await ricarica();
       } catch (err) {
         App.occupato(bottone, false);
-        App.mostra(messaggio, err.message, 'errore');
+        App.toast(err.message, 'errore');
       }
     });
   }
@@ -196,51 +193,52 @@
     const azione = bottone.dataset.azione;
     App.pulisci(messaggio);
 
-    if (azione === 'rinomina') {
-      chiediNuovoNome(blocco, utente);
-      return;
-    }
+    if (azione === 'rinomina') { chiediNuovoNome(blocco, utente); return; }
+
     if (azione === 'azzera-ai') {
       App.occupato(bottone, true, '...');
       try {
         await api('POST', '/api/admin/utenti/' + id + '/azzera-ai', {});
-        App.mostra(messaggio, 'Contatore AI azzerato per ' + utente.name + '.', 'ok');
+        App.toast('Contatore AI azzerato per ' + utente.name, 'ok');
         await ricarica();
       } catch (err) {
         App.occupato(bottone, false);
-        App.mostra(messaggio, err.message, 'errore');
+        App.toast(err.message, 'errore');
       }
       return;
     }
+
     if (azione === 'sessioni') {
       App.occupato(bottone, true, '...');
       try {
         const dati = await api('POST', '/api/admin/utenti/' + id + '/sessioni/termina', {});
-        App.mostra(messaggio, 'Sessioni chiuse: ' + dati.chiuse + '.', 'ok');
+        App.toast('Sessioni chiuse: ' + dati.chiuse, 'ok');
         await ricarica();
       } catch (err) {
         App.occupato(bottone, false);
-        App.mostra(messaggio, err.message, 'errore');
+        App.toast(err.message, 'errore');
       }
       return;
     }
+
     if (azione === 'reset') {
       chiediConferma(blocco, utente,
-        'Vengono cancellati profilo, pesate, allenamenti e report AI. L utente resta e rifara il questionario iniziale. Prima viene creata una copia di sicurezza.',
+        'Vengono cancellati profilo, pesate, allenamenti e report AI. L utente resta e rifara il questionario. Prima viene creata una copia di sicurezza.',
         'Azzera i dati',
         async function (conferma) {
           await api('POST', '/api/admin/utenti/' + id + '/reset', { conferma: conferma });
-          App.mostra(messaggio, 'Dati azzerati, backup creato.', 'ok');
+          App.toast('Dati azzerati, backup creato', 'ok');
         });
       return;
     }
+
     if (azione === 'elimina') {
       chiediConferma(blocco, utente,
         'L utente e tutti i suoi dati vengono eliminati e si libera un posto. Prima viene creata una copia di sicurezza.',
         'Elimina utente',
         async function (conferma) {
           await api('DELETE', '/api/admin/utenti/' + id, { conferma: conferma });
-          App.mostra(messaggio, 'Utente eliminato, backup creato.', 'ok');
+          App.toast('Utente eliminato, backup creato', 'ok');
         });
     }
   });
@@ -248,21 +246,19 @@
   elencoBackup.addEventListener('click', async function (evento) {
     const bottone = evento.target.closest('[data-ripristina]');
     if (!bottone) return;
-    App.pulisci(messaggio);
     App.occupato(bottone, true, 'Ripristino...');
     try {
       const dati = await api('POST', '/api/admin/backup/' + bottone.dataset.ripristina + '/ripristina', {});
-      App.mostra(messaggio,
-        'Ripristinato ' + dati.utente.nome + (dati.ricreato ? ' (utente ricreato)' : '') +
-        ': ' + dati.ripristinati.allenamenti + ' allenamenti, ' + dati.ripristinati.pesate + ' pesate.', 'ok');
+      App.toast('Ripristinato ' + dati.utente.nome + (dati.ricreato ? ' (utente ricreato)' : '') +
+        ': ' + dati.ripristinati.allenamenti + ' allenamenti', 'ok');
       await ricarica();
     } catch (err) {
       App.occupato(bottone, false);
-      App.mostra(messaggio, err.message, 'errore');
+      App.toast(err.message, 'errore');
     }
   });
 
-  // --- Accesso ---------------------------------------------------------------
+  // --- Accesso ----------------------------------------------------------------
 
   const form = document.getElementById('form-admin');
   const erroreLogin = document.getElementById('errore-login');
@@ -277,9 +273,11 @@
       const dati = await App.api('POST', '/api/admin/login', { password: campoPassword.value });
       campoPassword.value = '';
       mostraPannello(true, dati.scadenza_minuti);
+      App.toast('Accesso amministratore', 'ok');
       await ricarica();
     } catch (err) {
       App.mostra(erroreLogin, err.message, 'errore');
+      App.vibra(60);
     } finally {
       App.occupato(bottoneEntra, false);
     }
@@ -303,5 +301,6 @@
     } catch (err) {
       App.mostra(messaggio, err.message, 'errore');
     }
+    App.icone();
   })();
 })();

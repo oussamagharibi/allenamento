@@ -50,6 +50,15 @@ app.use(
 app.use('/css', express.static(path.join(PUBLIC_DIR, 'css'), { maxAge: inProduzione ? '1h' : 0 }));
 app.use('/js', express.static(path.join(PUBLIC_DIR, 'js'), { maxAge: inProduzione ? '1h' : 0 }));
 
+// File della PWA: manifest, service worker e icone.
+app.use('/icone', express.static(path.join(PUBLIC_DIR, 'icone'), { maxAge: inProduzione ? '7d' : 0 }));
+app.get('/manifest.json', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'manifest.json')));
+app.get('/sw.js', (req, res) => {
+  // Il service worker non va mai messo in cache: altrimenti gli aggiornamenti non arrivano.
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(PUBLIC_DIR, 'sw.js'));
+});
+
 app.get('/salute', (req, res) => res.json({ ok: true }));
 
 // Pagina 1: password del sito.
