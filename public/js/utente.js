@@ -1,29 +1,43 @@
 /* Pagina 2: scelta del profilo e password personale.
-   Due passi: prima si sceglie il profilo, poi si entra con la propria password. */
+   Due passi: prima si sceglie il profilo, poi si entra con la propria password.
+
+   Regola di questa pagina: gli scheletri di caricamento non devono MAI restare
+   per sempre. Qualunque cosa vada storta, al loro posto compaiono un messaggio
+   con il pulsante "Riprova" e la tessera per creare un nuovo profilo. */
 (function () {
   'use strict';
 
-  const passoProfilo = document.getElementById('passo-profilo');
-  const passoPassword = document.getElementById('passo-password');
-  const griglia = document.getElementById('griglia');
-  const messaggio = document.getElementById('messaggio');
-  const posti = document.getElementById('posti');
-  const cardNuovo = document.getElementById('card-nuovo');
+  // Recupero tollerante: un elemento mancante non deve fermare tutto lo script.
+  function el(id) {
+    return document.getElementById(id);
+  }
 
-  const formNome = document.getElementById('form-nome');
-  const campoNome = document.getElementById('nome');
-  const bottoneAvanti = document.getElementById('avanti-nome');
+  function collega(elemento, evento, azione) {
+    if (elemento) elemento.addEventListener(evento, azione);
+  }
 
-  const formPassword = document.getElementById('form-password');
-  const errorePassword = document.getElementById('errore-password');
-  const campoPassword = document.getElementById('password');
-  const campoConferma = document.getElementById('conferma');
-  const bloccoConferma = document.getElementById('campo-conferma');
-  const bottoneEntra = document.getElementById('entra');
-  const notaPassword = document.getElementById('nota-password');
+  const passoProfilo = el('passo-profilo');
+  const passoPassword = el('passo-password');
+  const griglia = el('griglia');
+  const messaggio = el('messaggio');
+  const posti = el('posti');
+  const cardNuovo = el('card-nuovo');
+
+  const formNome = el('form-nome');
+  const campoNome = el('nome');
+  const bottoneAvanti = el('avanti-nome');
+
+  const formPassword = el('form-password');
+  const errorePassword = el('errore-password');
+  const campoPassword = el('password');
+  const campoConferma = el('conferma');
+  const bloccoConferma = el('campo-conferma');
+  const bottoneEntra = el('entra');
+  const notaPassword = el('nota-password');
 
   // Profilo scelto: nome e cosa serve fare (chiedi / imposta / crea).
   let scelto = null;
+  let caricamentoFatto = false;
 
   // --- Passo 1: i profili -----------------------------------------------------
 
@@ -45,33 +59,66 @@
   }
 
   function apriNuovo() {
+    if (!cardNuovo) return;
     cardNuovo.classList.remove('nascosto');
-    campoNome.focus();
+    if (campoNome) campoNome.focus();
     cardNuovo.scrollIntoView({ behavior: App.animazioniRidotte() ? 'auto' : 'smooth', block: 'center' });
   }
 
+  function collegaTessere() {
+    if (!griglia) return;
+    griglia.querySelectorAll('[data-nome]').forEach(function (b) {
+      b.addEventListener('click', function () { controlla(b.dataset.nome, b); });
+    });
+    collega(el('apri-nuovo'), 'click', apriNuovo);
+  }
+
+  // Elenco non disponibile: si spiega il problema e si lascia comunque una via d uscita.
+  function mostraErroreElenco(testo) {
+    caricamentoFatto = true;
+    if (!griglia) return;
+    griglia.innerHTML =
+      '<div class="messaggio errore" style="grid-column:1/-1; margin:0">' +
+      App.testoSicuro(testo || 'Non riesco a caricare i profili.') + '</div>' +
+      '<button type="button" class="tessera-utente" id="riprova" aria-label="Riprova a caricare i profili">' +
+      '<span class="avatar tratteggio" aria-hidden="true"><i data-lucide="rotate-ccw"></i></span>' +
+      '<span class="nome">Riprova</span></button>' +
+      tesseraNuovo();
+    if (posti) posti.textContent = '';
+    App.icone();
+    collega(el('riprova'), 'click', function () { carica(); });
+    collega(el('apri-nuovo'), 'click', apriNuovo);
+  }
+
   async function carica() {
+    if (!griglia) return;
+    griglia.innerHTML = '<div class="skeleton alto"></div><div class="skeleton alto"></div><div class="skeleton alto"></div>';
     try {
       const dati = await App.api('GET', '/api/auth/utenti');
-      let html = dati.utenti.map(tesseraHtml).join('');
-      if (dati.liberi > 0) html += tesseraNuovo();
-      griglia.innerHTML = html || '<p class="aiuto">Nessun profilo: creane uno.</p>';
+      const utenti = Array.isArray(dati && dati.utenti) ? dati.utenti : [];
+      const liberi = Number(dati && dati.liberi);
+      const massimo = Number(dati && dati.massimo) || 8;
 
-      posti.textContent = dati.liberi > 0
-        ? 'Profili usati: ' + dati.totale + ' su ' + dati.massimo + ' (liberi: ' + dati.liberi + ').'
-        : 'Tutti gli ' + dati.massimo + ' posti sono occupati: puoi entrare solo in un profilo esistente.';
+      let html = utenti.map(tesseraHtml).join('');
+      // Con l elenco vuoto la tessera "Nuovo" ci deve essere comunque: altrimenti
+      // la pagina resterebbe senza nessun modo di andare avanti.
+      if (!utenti.length || liberi > 0) html += tesseraNuovo();
+      griglia.innerHTML = html;
+      caricamentoFatto = true;
+
+      if (posti) {
+        posti.textContent = !utenti.length
+          ? 'Nessun profilo: creane uno per iniziare.'
+          : (liberi > 0
+            ? 'Profili usati: ' + utenti.length + ' su ' + massimo + ' (liberi: ' + liberi + ').'
+            : 'Tutti gli ' + massimo + ' posti sono occupati: puoi entrare solo in un profilo esistente.');
+      }
 
       App.icone();
-
-      griglia.querySelectorAll('[data-nome]').forEach(function (b) {
-        b.addEventListener('click', function () { controlla(b.dataset.nome, b); });
-      });
-      const nuovo = document.getElementById('apri-nuovo');
-      if (nuovo) nuovo.addEventListener('click', apriNuovo);
-      else if (!dati.utenti.length) apriNuovo();
+      collegaTessere();
+      if (!utenti.length) apriNuovo();
     } catch (err) {
-      griglia.innerHTML = '';
-      App.mostra(messaggio, err.message, 'errore');
+      mostraErroreElenco(err && err.message);
     }
   }
 
@@ -115,44 +162,54 @@
   };
 
   function apriPassword(nome, azione) {
+    if (!passoPassword || !passoProfilo) return;
     scelto = { nome: nome, azione: azione };
     const testi = TESTI[azione] || TESTI.chiedi;
 
-    document.getElementById('avatar-scelto').innerHTML = App.avatarHtml(nome);
-    document.getElementById('titolo-password').textContent =
-      azione === 'chiedi' ? testi.titolo + ', ' + nome : testi.titolo;
-    document.getElementById('sottotitolo-password').textContent = testi.sotto;
-    bottoneEntra.innerHTML = testi.bottone;
-    delete bottoneEntra.dataset.testo;
-    notaPassword.textContent = testi.nota;
+    const avatar = el('avatar-scelto');
+    if (avatar) avatar.innerHTML = App.avatarHtml(nome);
+    const titolo = el('titolo-password');
+    if (titolo) titolo.textContent = azione === 'chiedi' ? testi.titolo + ', ' + nome : testi.titolo;
+    const sotto = el('sottotitolo-password');
+    if (sotto) sotto.textContent = testi.sotto;
+    if (bottoneEntra) {
+      bottoneEntra.innerHTML = testi.bottone;
+      delete bottoneEntra.dataset.testo;
+    }
+    if (notaPassword) notaPassword.textContent = testi.nota;
 
     const serveConferma = azione !== 'chiedi';
-    bloccoConferma.classList.toggle('nascosto', !serveConferma);
-    campoConferma.required = serveConferma;
-    campoPassword.setAttribute('autocomplete', serveConferma ? 'new-password' : 'current-password');
-    campoPassword.value = '';
-    campoConferma.value = '';
+    if (bloccoConferma) bloccoConferma.classList.toggle('nascosto', !serveConferma);
+    if (campoConferma) {
+      campoConferma.required = serveConferma;
+      campoConferma.value = '';
+    }
+    if (campoPassword) {
+      campoPassword.setAttribute('autocomplete', serveConferma ? 'new-password' : 'current-password');
+      campoPassword.value = '';
+    }
 
     App.pulisci(errorePassword);
     passoProfilo.classList.add('nascosto');
     passoPassword.classList.remove('nascosto');
     App.icone();
-    campoPassword.focus();
+    if (campoPassword) campoPassword.focus();
   }
 
   function tornaIndietro() {
     scelto = null;
-    passoPassword.classList.add('nascosto');
-    passoProfilo.classList.remove('nascosto');
+    if (passoPassword) passoPassword.classList.add('nascosto');
+    if (passoProfilo) passoProfilo.classList.remove('nascosto');
     App.pulisci(errorePassword);
-    campoPassword.value = '';
-    campoConferma.value = '';
+    if (campoPassword) campoPassword.value = '';
+    if (campoConferma) campoConferma.value = '';
   }
 
   // Mostra e nascondi password.
   document.querySelectorAll('[data-mostra]').forEach(function (bottone) {
     bottone.addEventListener('click', function () {
-      const campo = document.getElementById(bottone.dataset.mostra);
+      const campo = el(bottone.dataset.mostra);
+      if (!campo) return;
       const visibile = campo.type === 'text';
       campo.type = visibile ? 'password' : 'text';
       bottone.innerHTML = '<i data-lucide="' + (visibile ? 'eye' : 'eye-off') + '"></i>';
@@ -164,13 +221,13 @@
     });
   });
 
-  formPassword.addEventListener('submit', async function (evento) {
+  collega(formPassword, 'submit', async function (evento) {
     evento.preventDefault();
     if (!scelto) return;
     App.pulisci(errorePassword);
 
-    const corpo = { nome: scelto.nome, password: campoPassword.value };
-    if (scelto.azione !== 'chiedi') corpo.conferma = campoConferma.value;
+    const corpo = { nome: scelto.nome, password: campoPassword ? campoPassword.value : '' };
+    if (scelto.azione !== 'chiedi') corpo.conferma = campoConferma ? campoConferma.value : '';
 
     App.occupato(bottoneEntra, true, 'Verifico...');
     try {
@@ -181,27 +238,36 @@
       App.occupato(bottoneEntra, false);
       App.mostra(errorePassword, err.message, 'errore');
       App.vibra(60);
-      campoPassword.select();
+      if (campoPassword) campoPassword.select();
       App.icone();
     }
   });
 
-  document.getElementById('indietro').addEventListener('click', tornaIndietro);
+  collega(el('indietro'), 'click', tornaIndietro);
 
-  formNome.addEventListener('submit', function (evento) {
+  collega(formNome, 'submit', function (evento) {
     evento.preventDefault();
-    controlla(campoNome.value, bottoneAvanti);
+    controlla(campoNome ? campoNome.value : '', bottoneAvanti);
   });
 
-  document.getElementById('annulla-nuovo').addEventListener('click', function () {
-    cardNuovo.classList.add('nascosto');
-    campoNome.value = '';
+  collega(el('annulla-nuovo'), 'click', function () {
+    if (cardNuovo) cardNuovo.classList.add('nascosto');
+    if (campoNome) campoNome.value = '';
   });
 
-  document.getElementById('logout').addEventListener('click', async function () {
+  collega(el('logout'), 'click', async function () {
     try { await App.api('POST', '/api/auth/logout'); } catch (err) { /* ignora */ }
     window.location.href = '/';
   });
 
   carica();
+
+  // Rete di sicurezza: se dopo 10 secondi gli scheletri sono ancora li (rete che
+  // non risponde, richiesta persa, script interrotto), si mostra comunque
+  // qualcosa di utilizzabile invece di lasciare la pagina bloccata.
+  setTimeout(function () {
+    if (!caricamentoFatto && griglia && griglia.querySelector('.skeleton')) {
+      mostraErroreElenco('Caricamento troppo lento: controlla la connessione.');
+    }
+  }, 10000);
 })();

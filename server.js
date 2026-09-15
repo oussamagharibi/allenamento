@@ -47,8 +47,18 @@ app.use(
 );
 
 // Solo CSS e JS sono statici: le pagine HTML passano dai controlli di accesso.
-app.use('/css', express.static(path.join(PUBLIC_DIR, 'css'), { maxAge: inProduzione ? '1h' : 0 }));
-app.use('/js', express.static(path.join(PUBLIC_DIR, 'js'), { maxAge: inProduzione ? '1h' : 0 }));
+// I file vengono sempre rivalidati ("no-cache" non vuol dire "non salvare": il
+// browser chiede al server se sono cambiati e di solito riceve un 304 leggero).
+// Serve perche le pagine HTML cambiano insieme ai loro script: se il browser
+// tenesse un JS vecchio accanto a un HTML nuovo, lo script cercherebbe elementi
+// che non esistono piu e la pagina resterebbe a meta.
+const staticiSempreFreschi = {
+  etag: true,
+  maxAge: 0,
+  setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache'),
+};
+app.use('/css', express.static(path.join(PUBLIC_DIR, 'css'), staticiSempreFreschi));
+app.use('/js', express.static(path.join(PUBLIC_DIR, 'js'), staticiSempreFreschi));
 
 // File della PWA: manifest, service worker e icone.
 app.use('/icone', express.static(path.join(PUBLIC_DIR, 'icone'), { maxAge: inProduzione ? '7d' : 0 }));
