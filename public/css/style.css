@@ -360,3 +360,39 @@ footer {
   padding: 8px;
 }
 .grafico canvas { max-width: 100%; }
+
+/* --- Coach AI --- */
+.testo-ai { margin-top: 12px; }
+.testo-ai h3 { margin-top: 16px; color: var(--accento); font-size: 1rem; }
+.testo-ai h4 { margin: 12px 0 6px; font-size: 0.95rem; }
+.testo-ai ul { margin: 0 0 12px; padding-left: 20px; }
+.testo-ai li { margin-bottom: 4px; }
+
+.lista-secca { margin: 8px 0 0; padding-left: 18px; font-size: 0.9rem; color: var(--testo-2); }
+.lista-secca li { margin-bottom: 3px; }
+
+.report {
+  background: var(--sfondo-3);
+  border: 1px solid var(--bordo);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.report summary { cursor: pointer; font-size: 0.9rem; color: var(--testo-2); }
+.report[open] summary { color: var(--testo); margin-bottom: 6px; }
+
+#chat { max-height: 420px; overflow-y: auto; margin-bottom: 12px; }
+#chat:empty { display: none; }
+.bolla {
+  border-radius: 12px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  font-size: 0.93rem;
+  max-width: 92%;
+}
+.bolla p { margin: 0 0 6px; }
+.bolla p:last-child { margin-bottom: 0; }
+.bolla.io { background: var(--accento-scuro); color: #eafff1; margin-left: auto; }
+.bolla.coach { background: var(--sfondo-3); border: 1px solid var(--bordo); }
+.bolla.coach h3, .bolla.coach h4 { font-size: 0.95rem; margin: 6px 0 4px; color: var(--accento); }
+.bolla.coach ul { margin: 0 0 6px; padding-left: 18px; }

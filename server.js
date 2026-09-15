@@ -74,6 +74,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/profilo', require('./routes/profilo'));
 app.use('/api/allenamenti', require('./routes/allenamenti'));
 app.use('/api/progressi', require('./routes/progressi'));
+app.use('/api/ai', require('./routes/ai'));
 
 app.use('/api', (req, res) => res.status(404).json({ errore: 'Endpoint non trovato' }));
 app.use((req, res) => res.redirect('/'));
