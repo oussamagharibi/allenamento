@@ -18,9 +18,13 @@ function confrontoSicuro(a, b) {
 }
 
 // 5 tentativi ogni 15 minuti sulla password del sito.
+// Contano solo i tentativi sbagliati: gli accessi riusciti non consumano il
+// limite, altrimenti piu persone dietro la stessa connessione (fino a 8 profili)
+// si bloccherebbero a vicenda entrando normalmente.
 const limiteLogin = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 5,
+  skipSuccessfulRequests: true,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { errore: 'Troppi tentativi. Riprova tra 15 minuti.' },
