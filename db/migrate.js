@@ -1,0 +1,93 @@
+// Migrazione automatica: viene eseguita a ogni avvio, e' idempotente.
+const { pool } = require('./index');
+
+const SQL = [
+  `CREATE TABLE IF NOT EXISTS users (
+     id         SERIAL PRIMARY KEY,
+     name       TEXT NOT NULL UNIQUE,
+     pin_hash   TEXT,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   )`,
+
+  // Il confronto dei nomi e' case-insensitive: l'indice garantisce l'unicita' reale.
+  `CREATE UNIQUE INDEX IF NOT EXISTS users_name_lower_idx ON users (lower(name))`,
+
+  `CREATE TABLE IF NOT EXISTS profiles (
+     user_id          INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+     peso             NUMERIC(5,2) NOT NULL,
+     altezza          INTEGER NOT NULL,
+     eta              INTEGER NOT NULL,
+     sesso            TEXT NOT NULL,
+     luogo            TEXT NOT NULL,
+     attrezzatura     TEXT[] NOT NULL DEFAULT '{}',
+     obiettivo        TEXT NOT NULL,
+     livello          TEXT NOT NULL,
+     giorni_settimana INTEGER NOT NULL,
+     minuti_sessione  INTEGER NOT NULL,
+     infortuni        TEXT NOT NULL DEFAULT '',
+     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+   )`,
+
+  `CREATE TABLE IF NOT EXISTS weight_logs (
+     id      SERIAL PRIMARY KEY,
+     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     peso    NUMERIC(5,2) NOT NULL,
+     misure  JSONB NOT NULL DEFAULT '{}'::jsonb,
+     data    DATE NOT NULL DEFAULT CURRENT_DATE
+   )`,
+
+  `CREATE INDEX IF NOT EXISTS weight_logs_user_idx ON weight_logs (user_id, data DESC)`,
+
+  `CREATE TABLE IF NOT EXISTS workouts (
+     id         SERIAL PRIMARY KEY,
+     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     data       DATE NOT NULL,
+     completato BOOLEAN NOT NULL DEFAULT FALSE,
+     esercizi   JSONB NOT NULL DEFAULT '[]'::jsonb,
+     titolo     TEXT,
+     origine    TEXT NOT NULL DEFAULT 'app',
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   )`,
+
+  `CREATE INDEX IF NOT EXISTS workouts_user_idx ON workouts (user_id, data DESC)`,
+
+  `CREATE TABLE IF NOT EXISTS ai_usage (
+     user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     data      DATE NOT NULL DEFAULT CURRENT_DATE,
+     conteggio INTEGER NOT NULL DEFAULT 0,
+     PRIMARY KEY (user_id, data)
+   )`,
+
+  `CREATE TABLE IF NOT EXISTS ai_reports (
+     id         SERIAL PRIMARY KEY,
+     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     tipo       TEXT NOT NULL,
+     contenuto  TEXT NOT NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   )`,
+
+  `CREATE INDEX IF NOT EXISTS ai_reports_user_idx ON ai_reports (user_id, created_at DESC)`,
+];
+
+async function migra() {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const sql of SQL) {
+      await client.query(sql);
+    }
+    await client.query('COMMIT');
+    const { rows } = await pool.query(
+      `SELECT table_name FROM information_schema.tables
+        WHERE table_schema = 'public' ORDER BY table_name`
+    );
+    console.log('[db] migrazione completata. Tabelle:', rows.map((r) => r.table_name).join(', '));
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = { migra };
