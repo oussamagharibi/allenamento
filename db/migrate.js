@@ -71,6 +71,11 @@ const SQL = [
   // Ultimo accesso: aggiunto dopo, quindi va creato anche sui database gia esistenti.
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ`,
 
+  // Sezione alimentazione: campi facoltativi aggiunti dopo il primo rilascio.
+  `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS preferenze_alimentari TEXT[] NOT NULL DEFAULT '{}'`,
+  `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS allergie TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS pasti_giorno INTEGER NOT NULL DEFAULT 4`,
+
   // Copia di sicurezza creata prima di ogni azzeramento o eliminazione dal pannello admin.
   `CREATE TABLE IF NOT EXISTS admin_backups (
      id         SERIAL PRIMARY KEY,

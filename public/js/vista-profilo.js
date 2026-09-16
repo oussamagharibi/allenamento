@@ -12,6 +12,8 @@
     dimagrire: 'Dimagrire', massa: 'Aumentare la massa',
     tonificare: 'Tonificare', resistenza: 'Resistenza',
     principiante: 'Principiante', intermedio: 'Intermedio', avanzato: 'Avanzato',
+    vegetariano: 'Vegetariano', vegano: 'Vegano', halal: 'Halal',
+    'senza lattosio': 'Senza lattosio', 'senza glutine': 'Senza glutine',
   };
 
   const NOTE = {
@@ -32,11 +34,13 @@
     manubri: 'dumbbell', elastici: 'cable', sbarra: 'grip-horizontal', panca: 'armchair',
     dimagrire: 'flame', massa: 'dumbbell', tonificare: 'activity', resistenza: 'heart-pulse',
     principiante: 'sprout', intermedio: 'trending-up', avanzato: 'zap',
+    vegetariano: 'carrot', vegano: 'leaf', halal: 'moon-star',
+    'senza lattosio': 'milk-off', 'senza glutine': 'wheat-off',
   };
 
   let bozza = null;
   let passo = 0;
-  const TOTALE_PASSI = 5;
+  const TOTALE_PASSI = 6;
 
   function etichetta(v) { return ETICHETTE[v] || v; }
 
@@ -172,13 +176,25 @@
           '<p class="etichetta" style="margin-top:var(--s-4)">Minuti per sessione</p>' +
           numeriHtml('minuti_sessione', minuti, bozza.minuti_sessione, '');
 
-      default:
+      case 4:
         return '<h2 class="passo-titolo">Infortuni o zone delicate</h2>' +
           '<p class="aiuto">Gli esercizi che caricano queste zone vengono sostituiti automaticamente.</p>' +
           scelteMultipleHtml('zone', o.zone_infortuni, bozza.zone) +
           '<div class="campo" style="margin-top:var(--s-4)"><label for="note">Altro da segnalare</label>' +
           '<textarea id="note" maxlength="200" placeholder="Facoltativo">' + App.testoSicuro(bozza.note) + '</textarea></div>' +
           '<div class="messaggio info">In caso di dolore fermati e senti un medico: questa app non fa diagnosi.</div>';
+
+      default:
+        return '<h2 class="passo-titolo">Alimentazione</h2>' +
+          '<p class="aiuto">Facoltativo: serve per filtrare gli esempi di pasti. Puoi saltare e compilarlo dopo.</p>' +
+          '<p class="etichetta" style="margin-top:var(--s-4)">Preferenze alimentari</p>' +
+          scelteMultipleHtml('preferenze', (o.preferenze_alimentari || []).filter(function (x) { return x !== 'nessuna'; }), bozza.preferenze) +
+          '<p class="aiuto">Se non hai preferenze particolari, lascia tutto vuoto.</p>' +
+          '<div class="campo" style="margin-top:var(--s-4)"><label for="allergie">Allergie o intolleranze</label>' +
+          '<textarea id="allergie" maxlength="200" placeholder="Es: lattosio, noci">' + App.testoSicuro(bozza.allergie) + '</textarea>' +
+          '<p class="aiuto">Gli alimenti che contengono quello che scrivi non compariranno negli esempi.</p></div>' +
+          '<p class="etichetta" style="margin-top:var(--s-4)">Quanti pasti fai al giorno</p>' +
+          numeriHtml('pasti_giorno', [3, 4, 5, 6], bozza.pasti_giorno, '');
     }
   }
 
@@ -197,7 +213,12 @@
       if (eta < 18) App.toast('Hai meno di 18 anni: fatti seguire da un adulto e senti il medico.', 'avviso', 6000);
     }
     if (passo === 4) {
-      bozza.note = document.getElementById('note').value.trim();
+      const note = document.getElementById('note');
+      if (note) bozza.note = note.value.trim();
+    }
+    if (passo === 5) {
+      const allergie = document.getElementById('allergie');
+      if (allergie) bozza.allergie = allergie.value.trim();
     }
     return null;
   }
@@ -215,6 +236,9 @@
       giorni_settimana: bozza.giorni_settimana,
       minuti_sessione: bozza.minuti_sessione,
       infortuni: bozza.zone.concat(bozza.note ? [bozza.note] : []).join(', '),
+      preferenze_alimentari: bozza.preferenze,
+      allergie: bozza.allergie,
+      pasti_giorno: bozza.pasti_giorno,
     };
     App.occupato(bottone, true, 'Calcolo...');
     try {
@@ -376,6 +400,13 @@
     html += statistica('Corpo', App.numero(p.peso, 1) + ' kg', p.altezza + ' cm, ' + p.eta + ' anni');
     html += '</div>';
     if (zone) html += '<p class="aiuto">Zone da rispettare: ' + App.testoSicuro(zone) + '</p>';
+
+    const preferenze = (p.preferenze_alimentari || []).map(etichetta).join(', ');
+    const allergie = String(p.allergie || '').trim();
+    html += '<p class="aiuto"><i data-lucide="salad" style="width:14px;height:14px;vertical-align:-2px"></i> ' +
+      (p.pasti_giorno || 4) + ' pasti al giorno' +
+      (preferenze ? ' &middot; ' + App.testoSicuro(preferenze) : '') +
+      (allergie ? ' &middot; niente ' + App.testoSicuro(allergie) : '') + '</p>';
     return html;
   }
 
@@ -393,6 +424,7 @@
           peso: '', altezza: '', eta: '', sesso: 'uomo', luogo: 'casa', attrezzatura: [],
           obiettivo: 'tonificare', livello: 'principiante', giorni_settimana: 3,
           minuti_sessione: 45, zone: [], note: '',
+          preferenze: [], allergie: '', pasti_giorno: 4,
         };
         passo = 0;
       }
@@ -423,6 +455,9 @@
           attrezzatura: (p.attrezzatura || []).slice(), obiettivo: p.obiettivo, livello: p.livello,
           giorni_settimana: p.giorni_settimana, minuti_sessione: p.minuti_sessione,
           zone: zone, note: note.replace(/[,;.]+/g, ' ').replace(/\s+/g, ' ').trim(),
+          preferenze: (p.preferenze_alimentari || []).slice(),
+          allergie: p.allergie || '',
+          pasti_giorno: p.pasti_giorno || 4,
         };
         passo = 0;
         disegnaWizard(el);

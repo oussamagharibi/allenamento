@@ -9,6 +9,7 @@ const calcoli = require('../lib/calcoli');
 const E = require('../lib/esercizi');
 const generatore = require('../lib/generatore');
 const schede = require('../lib/schede');
+const nutrizione = require('../lib/nutrizione');
 const prompt = require('../lib/prompt');
 const { apiUtente } = require('../middleware/auth');
 const { leggiProfilo } = require('./profilo');
@@ -156,6 +157,9 @@ async function contestoUtente(userId) {
   return {
     profilo,
     riepilogo: calcoli.riepilogo(profilo),
+    // Serve sia alla rotta alimentazione sia alla chat, che puo parlare di cibo.
+    nutrizione: nutrizione.piano(profilo),
+    allergeni: C.allergeniDaTesto(profilo.allergie),
     pesi: pesi.slice().reverse(),
     allenamenti: allenamenti.slice().reverse(),
     attrezzatura: contestoEsercizi.attrezzatura,
@@ -448,6 +452,45 @@ router.post('/scheda/accetta', async (req, res, next) => {
     const inseriti = await schede.salvaSettimana(req.session.userId, settimana, 'ai');
     res.json({ ok: true, allenamenti: inseriti.map((a) => ({ id: a.id, data: a.data, titolo: a.titolo })) });
   } catch (err) {
+    next(err);
+  }
+});
+
+// Piano pasti di una giornata, costruito sul profilo e sulle sue preferenze.
+router.post('/alimentazione', async (req, res, next) => {
+  const preparata = await preparaChiamata(req, res).catch(function (err) { next(err); return null; });
+  if (!preparata) return;
+
+  try {
+    const contesto = preparata.contesto;
+    const risposta = await chiamaClaude(
+      'alimentazione',
+      prompt.sistemaAlimentazione(contesto.profilo, contesto.nutrizione),
+      [{ role: 'user', content: 'Questi sono i miei dati in JSON:\n' + prompt.datiUtente(contesto) +
+        '\n\nProponimi i pasti di una giornata.' }],
+      MAX_TOKEN_TESTO
+    );
+    if (!risposta.testo) {
+      await rimborsaRichiesta(req.session.userId);
+      return res.status(502).json({ errore: 'Il coach non ha prodotto testo. Riprova.' });
+    }
+
+    const salvato = await db.uno(
+      `INSERT INTO ai_reports (user_id, tipo, contenuto) VALUES ($1, 'alimentazione', $2)
+       RETURNING id, tipo, contenuto, created_at`,
+      [req.session.userId, risposta.testo]
+    );
+
+    res.json({
+      ok: true,
+      report: salvato,
+      troncata: risposta.troncata,
+      restanti: preparata.restanti,
+      token: { ingresso: risposta.uso.input_tokens || 0, uscita: risposta.uso.output_tokens || 0 },
+    });
+  } catch (err) {
+    await rimborsaRichiesta(req.session.userId);
+    if (rispondiErroreAi(err, res)) return;
     next(err);
   }
 });

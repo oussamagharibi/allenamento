@@ -20,12 +20,15 @@ const OPZIONI = {
   zone_infortuni: C.ZONE_INFORTUNI,
   minuti: { min: C.MINUTI_MIN, max: C.MINUTI_MAX },
   giorni: { min: C.GIORNI_MIN, max: C.GIORNI_MAX },
+  preferenze_alimentari: C.PREFERENZE_ALIMENTARI,
+  pasti: { min: C.PASTI_MIN, max: C.PASTI_MAX },
 };
 
 async function leggiProfilo(userId) {
   return db.uno(
     `SELECT user_id, peso::float AS peso, altezza, eta, sesso, luogo, attrezzatura,
-            obiettivo, livello, giorni_settimana, minuti_sessione, infortuni, updated_at
+            obiettivo, livello, giorni_settimana, minuti_sessione, infortuni,
+            preferenze_alimentari, allergie, pasti_giorno, updated_at
        FROM profiles WHERE user_id = $1`,
     [userId]
   );
@@ -54,8 +57,9 @@ router.post('/', async (req, res, next) => {
     const v = esito.valori;
     const salvato = await db.uno(
       `INSERT INTO profiles (user_id, peso, altezza, eta, sesso, luogo, attrezzatura,
-                             obiettivo, livello, giorni_settimana, minuti_sessione, infortuni, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now())
+                             obiettivo, livello, giorni_settimana, minuti_sessione, infortuni,
+                             preferenze_alimentari, allergie, pasti_giorno, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, now())
        ON CONFLICT (user_id) DO UPDATE SET
             peso = EXCLUDED.peso,
             altezza = EXCLUDED.altezza,
@@ -68,9 +72,13 @@ router.post('/', async (req, res, next) => {
             giorni_settimana = EXCLUDED.giorni_settimana,
             minuti_sessione = EXCLUDED.minuti_sessione,
             infortuni = EXCLUDED.infortuni,
+            preferenze_alimentari = EXCLUDED.preferenze_alimentari,
+            allergie = EXCLUDED.allergie,
+            pasti_giorno = EXCLUDED.pasti_giorno,
             updated_at = now()
        RETURNING user_id, peso::float AS peso, altezza, eta, sesso, luogo, attrezzatura,
-                 obiettivo, livello, giorni_settimana, minuti_sessione, infortuni, updated_at`,
+                 obiettivo, livello, giorni_settimana, minuti_sessione, infortuni,
+                 preferenze_alimentari, allergie, pasti_giorno, updated_at`,
       [
         req.session.userId,
         v.peso,
@@ -84,6 +92,9 @@ router.post('/', async (req, res, next) => {
         v.giorni_settimana,
         v.minuti_sessione,
         v.infortuni,
+        v.preferenze_alimentari,
+        v.allergie,
+        v.pasti_giorno,
       ]
     );
 

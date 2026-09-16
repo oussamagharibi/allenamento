@@ -63,6 +63,23 @@ e sessione rigenerata dopo ogni accesso riuscito. Dal profilo si cambia la passw
 (serve quella attuale) e le altre sessioni aperte vengono chiuse; dal pannello admin
 si puo azzerare la password di un utente, che ne imposta una nuova al rientro.
 
+## Alimentazione
+
+Sezione con i fabbisogni della giornata calcolati dal profilo: calorie (mai sotto il
+metabolismo basale), proteine 1,2-1,6 g/kg oppure 1,6-2,0 g/kg se l'obiettivo e la
+massa, grassi al 25-30% delle calorie, carboidrati per differenza e acqua a 30-35
+ml/kg, con la divisione nei pasti della giornata. Sotto i 18 anni non compare nessun
+target in grammi, solo consigli generali.
+
+Gli esempi di pasti, le fonti proteiche e le idee per prima e dopo l'allenamento
+sono filtrati con le preferenze alimentari e le allergie del profilo
+(`lib/alimenti.js` e `lib/nutrizione.js`, contenuti fissi). La sezione integratori
+dice per ognuno se serve davvero, quando e quanto, e tiene fuori brucia grassi,
+prodotti detox e pre-workout ad alta caffeina. Il Coach AI puo scrivere il piano
+pasti di una giornata (`POST /api/ai/alimentazione`), rispettando preferenze e
+allergie e senza mai scendere sotto il metabolismo basale.
+`node scripts/verifica-alimentazione.js` controlla calcoli e filtri.
+
 ## Schede degli esercizi
 
 Ogni esercizio del catalogo (81 in tutto, compresi riscaldamento e stretching) ha

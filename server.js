@@ -102,6 +102,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/profilo', require('./routes/profilo'));
 app.use('/api/allenamenti', require('./routes/allenamenti'));
 app.use('/api/esercizi', require('./routes/esercizi'));
+app.use('/api/alimentazione', require('./routes/alimentazione'));
 app.use('/api/progressi', require('./routes/progressi'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/admin', require('./routes/admin'));

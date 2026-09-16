@@ -64,12 +64,14 @@
     return html;
   }
 
+  const TITOLI_REPORT = { analisi: 'Analisi', alimentazione: 'Piano pasti' };
+
   function storicoHtml(report) {
-    const analisi = (report || []).filter(function (r) { return r.tipo === 'analisi'; });
-    if (!analisi.length) return '<p class="aiuto">Nessuna analisi salvata per ora.</p>';
+    const salvati = (report || []).filter(function (r) { return TITOLI_REPORT[r.tipo]; });
+    if (!salvati.length) return '<p class="aiuto">Niente di salvato per ora.</p>';
     let html = '';
-    for (const r of analisi) {
-      html += '<details class="report"><summary>Analisi del ' + dataOra(r.created_at) + '</summary>' +
+    for (const r of salvati) {
+      html += '<details class="report"><summary>' + TITOLI_REPORT[r.tipo] + ' del ' + dataOra(r.created_at) + '</summary>' +
         '<div class="testo-ai">' + markdown(r.contenuto) + '</div></details>';
     }
     return html;
@@ -100,8 +102,9 @@
       let html = '<div class="card card-accento"><div class="card-testa">' +
         '<h2><i data-lucide="sparkles"></i> Coach AI</h2><span class="tag" id="contatore-ai"></span></div>';
       html += '<div class="riga-bottoni">' +
-        '<button type="button" class="btn-principale" id="btn-analisi" style="flex:1"><i data-lucide="line-chart"></i> Analizza i miei progressi</button>' +
-        '<button type="button" class="btn-contorno" id="btn-scheda" style="flex:1"><i data-lucide="wand-sparkles"></i> Genera scheda con AI</button>' +
+        '<button type="button" class="btn-principale" id="btn-analisi" style="flex:1 1 170px"><i data-lucide="line-chart"></i> Analizza i miei progressi</button>' +
+        '<button type="button" class="btn-contorno" id="btn-scheda" style="flex:1 1 150px"><i data-lucide="wand-sparkles"></i> Genera scheda con AI</button>' +
+        '<button type="button" class="btn-contorno" id="btn-pasti" style="flex:1 1 150px"><i data-lucide="salad"></i> Piano pasti di un giorno</button>' +
         '</div><div id="risultato-ai"></div></div>';
 
       html += '<div class="card"><h2>Fai una domanda</h2>' +
@@ -110,7 +113,7 @@
         '<textarea id="domanda" maxlength="600" placeholder="Es: come miglioro lo squat senza far male alle ginocchia?"></textarea>' +
         '</div><button type="submit" id="btn-chat" class="btn-principale btn-blocco"><i data-lucide="send"></i> Invia</button></form></div>';
 
-      html += '<div class="card"><h2>Storico analisi</h2><div id="storico-ai"></div></div>';
+      html += '<div class="card"><h2>Storico</h2><div id="storico-ai"></div></div>';
       el.innerHTML = html;
       App.icone();
       aggiornaContatore(stato.restanti, stato.limite);
@@ -142,6 +145,27 @@
           if (err.dati && err.dati.restanti !== undefined) aggiornaContatore(err.dati.restanti, stato.limite);
         } finally {
           App.occupato(btnAnalisi, false);
+        }
+      });
+
+      // --- Piano pasti ---
+      const btnPasti = document.getElementById('btn-pasti');
+      btnPasti.addEventListener('click', async function () {
+        App.occupato(btnPasti, true, 'Preparo...');
+        risultato.innerHTML = App.scheletro(4);
+        try {
+          const dati = await App.api('POST', '/api/ai/alimentazione', {});
+          risultato.innerHTML = '<div class="testo-ai">' + markdown(dati.report.contenuto) + '</div>';
+          aggiornaContatore(dati.restanti, stato.limite);
+          if (dati.troncata) App.toast('Risposta interrotta per lunghezza: riprova.', 'avviso');
+          else App.toast('Piano pasti pronto', 'ok');
+          await ricaricaStorico();
+        } catch (err) {
+          risultato.innerHTML = '';
+          App.toast(err.message, 'errore');
+          if (err.dati && err.dati.restanti !== undefined) aggiornaContatore(err.dati.restanti, stato.limite);
+        } finally {
+          App.occupato(btnPasti, false);
         }
       });
 

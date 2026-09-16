@@ -6,7 +6,7 @@
   const Stato = window.Stato || (window.Stato = {});
   const messaggio = document.getElementById('messaggio-globale');
 
-  const NOMI_VISTE = ['dashboard', 'allenamento', 'progressi', 'ai', 'profilo'];
+  const NOMI_VISTE = ['dashboard', 'allenamento', 'alimentazione', 'progressi', 'ai', 'profilo'];
 
   function contenitore(nome) {
     return document.getElementById('vista-' + nome);
