@@ -1173,3 +1173,86 @@ img, canvas, svg { max-width: 100%; }
   .barra-basso a { font-size: 0.62rem; padding: 7px 1px; gap: 1px; }
   .barra-basso a [data-lucide] { width: 19px; height: 19px; }
 }
+
+/* --- Diario alimentare -------------------------------------------------------- */
+
+/* I grafici stanno uno sotto l altro su telefono e in griglia su schermo grande. */
+.griglia-grafici { display: grid; grid-template-columns: 1fr; gap: var(--s-4); margin-bottom: var(--s-4); }
+.griglia-grafici .card { margin-bottom: 0; }
+@media (min-width: 900px) {
+  .griglia-grafici { grid-template-columns: 1fr 1fr; }
+  .griglia-grafici .card.larga { grid-column: 1 / -1; }
+}
+
+/* Esiti della giornata */
+.riga-esito {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  margin-bottom: 6px;
+  background: var(--sfondo-2);
+  border: 1px solid var(--bordo);
+  border-left-width: 3px;
+  border-radius: var(--r-m);
+}
+.riga-esito.ok { border-left-color: var(--ok); }
+.riga-esito.poco { border-left-color: var(--info); }
+.riga-esito.troppo { border-left-color: var(--avviso); }
+.riga-esito .icona-esito { flex: 0 0 auto; width: 20px; height: 20px; margin-top: 2px; }
+.riga-esito.ok .icona-esito { color: var(--ok); }
+.riga-esito.poco .icona-esito { color: var(--info); }
+.riga-esito.troppo .icona-esito { color: var(--avviso); }
+.testo-esito { min-width: 0; flex: 1; }
+.testo-esito .stato { font-size: 0.82rem; color: var(--testo-2); }
+.testo-esito p { margin: 4px 0 0; }
+
+/* Anelli della giornata */
+.griglia-anelli {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: var(--s-3);
+  padding: var(--s-2) 0;
+}
+.anello-piccolo { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.cerchio-piccolo { position: relative; width: 78px; height: 78px; }
+.cerchio-piccolo svg { transform: rotate(-90deg); display: block; }
+.cerchio-piccolo .traccia { stroke: var(--bordo); }
+.cerchio-piccolo circle { transition: stroke-dashoffset 800ms cubic-bezier(0.4, 0, 0.2, 1); }
+.cerchio-piccolo .dentro { position: absolute; inset: 0; display: grid; place-items: center; }
+.cerchio-piccolo .dentro strong { font-family: var(--font-titolo); font-size: 0.95rem; }
+.etichetta-anello { font-size: 0.72rem; color: var(--testo-2); line-height: 1.3; }
+
+/* Pasti registrati */
+.riga-pasto {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2);
+  margin-bottom: 6px;
+  background: var(--sfondo-2);
+  border: 1px solid var(--bordo);
+  border-radius: var(--r-m);
+}
+.miniatura {
+  flex: 0 0 auto;
+  width: 54px;
+  height: 54px;
+  border-radius: var(--r-s);
+  object-fit: cover;
+  background: var(--superficie-alta);
+  border: 1px solid var(--bordo);
+}
+.miniatura.vuota { display: grid; place-items: center; color: var(--testo-2); }
+.testo-pasto { flex: 1; min-width: 0; }
+.testo-pasto p { margin: 2px 0; }
+.testo-pasto .stato { font-size: 0.78rem; color: var(--testo-2); font-variant-numeric: tabular-nums; }
+
+.anteprima-foto {
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  border-radius: var(--r-m);
+  border: 1px solid var(--bordo);
+  margin: 0 auto var(--s-3);
+}

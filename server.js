@@ -18,6 +18,9 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
+// L analisi della foto riceve un immagine in base64: solo per quella rotta il
+// corpo puo essere piu grande. Il parser generale resta piccolo.
+app.use('/api/ai/pasto', express.json({ limit: '4mb' }));
 app.use(express.json({ limit: '256kb' }));
 app.use(express.urlencoded({ extended: false, limit: '256kb' }));
 
@@ -103,6 +106,7 @@ app.use('/api/profilo', require('./routes/profilo'));
 app.use('/api/allenamenti', require('./routes/allenamenti'));
 app.use('/api/esercizi', require('./routes/esercizi'));
 app.use('/api/alimentazione', require('./routes/alimentazione'));
+app.use('/api/diario', require('./routes/diario'));
 app.use('/api/progressi', require('./routes/progressi'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/admin', require('./routes/admin'));
@@ -112,8 +116,17 @@ app.use((req, res) => res.redirect('/'));
 
 // Gestore errori: niente dettagli interni verso il browser.
 app.use((err, req, res, next) => {
-  console.error('[errore]', err && err.stack ? err.stack : err);
   if (res.headersSent) return next(err);
+
+  // Corpo troppo grande (per esempio una foto non ridotta): si dice chiaramente.
+  if (err && (err.type === 'entity.too.large' || err.status === 413)) {
+    return res.status(413).json({ errore: 'Dati troppo grandi: riduci la foto e riprova.' });
+  }
+  if (err && err.type === 'entity.parse.failed') {
+    return res.status(400).json({ errore: 'Richiesta non leggibile.' });
+  }
+
+  console.error('[errore]', err && err.stack ? err.stack : err);
   res.status(500).json({ errore: 'Errore interno del server' });
 });
 

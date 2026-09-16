@@ -80,6 +80,39 @@ pasti di una giornata (`POST /api/ai/alimentazione`), rispettando preferenze e
 allergie e senza mai scendere sotto il metabolismo basale.
 `node scripts/verifica-alimentazione.js` controlla calcoli e filtri.
 
+## Diario alimentare
+
+Acqua e pasti della giornata, nella dashboard e nella pagina Alimentazione.
+
+L'acqua si registra con i pulsanti rapidi (+250 ml, +500 ml, +1 L) o scrivendo i
+litri; l'ultima aggiunta si annulla con un tocco. Il traguardo viene dai 30-35
+ml/kg di `lib/nutrizione.js`, con mezzo litro in piu nei giorni in cui e previsto
+un allenamento.
+
+I pasti si aggiungono a mano oppure da una foto: la foto viene ridotta nel browser
+a 1024px prima di partire, il server accetta solo JPEG, PNG e WebP fino a 2 MB e
+chiede a Claude una stima in JSON (`POST /api/ai/pasto`, limite di 8 analisi al
+giorno, separato dalle 10 richieste AI). La stima arriva come bozza modificabile:
+si corregge e si salva, oppure si scarta. Del piatto resta solo una miniatura da
+200px dentro PostgreSQL, visibile al solo proprietario; la foto originale non viene
+mai salvata.
+
+`lib/diario.js` confronta i totali del giorno con i traguardi (carboidrati e calorie
+un po' piu alti nei giorni di allenamento) e per ogni voce dice se e in linea, se
+manca qualcosa o se si e andati sopra, con un suggerimento che rispetta preferenze
+alimentari e allergie. Sotto i due pasti registrati non si esprime: dice solo che i
+dati non bastano. Il tono resta neutro, non si consiglia mai di scendere sotto il
+metabolismo basale e, se piu giorni di fila risultano molto sotto, spariscono i
+numeri e compare un invito a parlare con un medico o un nutrizionista.
+
+La dashboard mostra l'acqua degli ultimi 7 giorni in litri con la linea del
+traguardo e i giorni di allenamento in evidenza, i macro degli ultimi 7 giorni a
+barre raggruppate con le linee dei traguardi, e in alternativa i quattro anelli di
+oggi. Il riepilogo di acqua e macro della settimana (solo totali, mai le immagini)
+viene passato anche all'analisi AI e alla chat.
+`node scripts/verifica-diario.js` controlla traguardi, esiti, suggerimenti e la
+lettura della risposta AI.
+
 ## Schede degli esercizi
 
 Ogni esercizio del catalogo (81 in tutto, compresi riscaldamento e stretching) ha
@@ -117,9 +150,9 @@ finisce in `admin_log`. Se `ADMIN_PASSWORD` non e impostata, `/admin` risponde 4
 ```
 server.js           avvio, sessioni, rotte, migrazione
 db/                 pool PostgreSQL e migrazione
-lib/                calcoli, catalogo esercizi, generatore schede
+lib/                calcoli, catalogo esercizi, generatore schede, nutrizione, diario
 middleware/auth.js  protezione sito + utente
-routes/             auth, profilo, allenamenti, progressi, AI
+routes/             auth, profilo, allenamenti, progressi, alimentazione, diario, AI
 public/             frontend (HTML/CSS/JS vanilla)
 ```
 

@@ -119,6 +119,8 @@ router.get('/utenti', async (req, res, next) => {
               (SELECT COUNT(*) FROM workouts w WHERE w.user_id = u.id)::int AS allenamenti,
               (SELECT COUNT(*) FROM workouts w WHERE w.user_id = u.id AND w.completato)::int AS completati,
               (SELECT COUNT(*) FROM weight_logs l WHERE l.user_id = u.id)::int AS pesate,
+              (SELECT COUNT(*) FROM meal_logs m WHERE m.user_id = u.id)::int AS pasti_registrati,
+              (SELECT COUNT(*) FROM water_logs a WHERE a.user_id = u.id)::int AS registrazioni_acqua,
               COALESCE((SELECT a.conteggio FROM ai_usage a
                          WHERE a.user_id = u.id AND a.data = CURRENT_DATE), 0)::int AS ai_oggi,
               EXISTS(SELECT 1 FROM profiles p WHERE p.user_id = u.id) AS profilo
@@ -185,6 +187,17 @@ async function raccogliDati(esecutore, userId) {
   const allenamenti = (await esecutore.query('SELECT * FROM workouts WHERE user_id = $1 ORDER BY data ASC, id ASC', [userId])).rows;
   const report = (await esecutore.query('SELECT * FROM ai_reports WHERE user_id = $1 ORDER BY created_at ASC', [userId])).rows;
   const usoAi = (await esecutore.query('SELECT * FROM ai_usage WHERE user_id = $1 ORDER BY data ASC', [userId])).rows;
+  const acqua = (await esecutore.query(
+    'SELECT id, user_id, data, ml, created_at FROM water_logs WHERE user_id = $1 ORDER BY data ASC, id ASC',
+    [userId]
+  )).rows;
+  // Le miniature restano fuori dall esportazione: sono foto personali.
+  const pasti = (await esecutore.query(
+    `SELECT id, user_id, data, tipo_pasto, descrizione, calorie, proteine, carboidrati, grassi,
+            fonte, confidenza, (thumbnail IS NOT NULL) AS aveva_foto, created_at
+       FROM meal_logs WHERE user_id = $1 ORDER BY data ASC, id ASC`,
+    [userId]
+  )).rows;
   return {
     versione: 1,
     esportato_il: new Date().toISOString(),
@@ -194,6 +207,8 @@ async function raccogliDati(esecutore, userId) {
     workouts: allenamenti,
     ai_reports: report,
     ai_usage: usoAi,
+    water_logs: acqua,
+    meal_logs: pasti,
   };
 }
 
@@ -233,6 +248,8 @@ async function salvaBackup(client, userId) {
 }
 
 async function cancellaDati(client, userId) {
+  await client.query('DELETE FROM water_logs WHERE user_id = $1', [userId]);
+  await client.query('DELETE FROM meal_logs WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM ai_usage WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM ai_reports WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM workouts WHERE user_id = $1', [userId]);
@@ -513,6 +530,29 @@ router.post('/backup/:id/ripristina', async (req, res, next) => {
       );
     }
 
+    for (const riga of Array.isArray(dati.water_logs) ? dati.water_logs : []) {
+      await client.query(
+        'INSERT INTO water_logs (user_id, ml, data, created_at) VALUES ($1, $2, COALESCE($3::date, CURRENT_DATE), COALESCE($4::timestamptz, now()))',
+        [utente.id, Number(riga.ml) || 0, valoreGiorno(riga), riga.created_at || null]
+      );
+    }
+
+    // I pasti tornano senza miniatura: le foto non finiscono nelle copie di sicurezza.
+    for (const riga of Array.isArray(dati.meal_logs) ? dati.meal_logs : []) {
+      await client.query(
+        `INSERT INTO meal_logs (user_id, data, tipo_pasto, descrizione, calorie, proteine,
+                                carboidrati, grassi, fonte, confidenza, created_at)
+              VALUES ($1, COALESCE($2::date, CURRENT_DATE), $3, $4, $5, $6, $7, $8, $9, $10,
+                      COALESCE($11::timestamptz, now()))`,
+        [
+          utente.id, valoreGiorno(riga), riga.tipo_pasto || 'spuntino', riga.descrizione || '',
+          Number(riga.calorie) || 0, Number(riga.proteine) || 0, Number(riga.carboidrati) || 0,
+          Number(riga.grassi) || 0, riga.fonte || 'manuale', riga.confidenza || null,
+          riga.created_at || null,
+        ]
+      );
+    }
+
     await registraLog(client, 'ripristina backup', nome + ' (backup ' + backup.id + ')');
     await client.query('COMMIT');
     res.json({
@@ -524,6 +564,8 @@ router.post('/backup/:id/ripristina', async (req, res, next) => {
         pesate: (dati.weight_logs || []).length,
         allenamenti: (dati.workouts || []).length,
         report: (dati.ai_reports || []).length,
+        acqua: (dati.water_logs || []).length,
+        pasti: (dati.meal_logs || []).length,
       },
     });
   } catch (err) {

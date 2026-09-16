@@ -10,7 +10,9 @@ const E = require('../lib/esercizi');
 const generatore = require('../lib/generatore');
 const schede = require('../lib/schede');
 const nutrizione = require('../lib/nutrizione');
+const diario = require('../lib/diario');
 const prompt = require('../lib/prompt');
+const { tipoImmagine } = require('../lib/validazione');
 const { apiUtente } = require('../middleware/auth');
 const { leggiProfilo } = require('./profilo');
 
@@ -18,8 +20,12 @@ const router = express.Router();
 router.use(apiUtente);
 
 const LIMITE = C.LIMITE_AI_GIORNALIERO;
+const LIMITE_FOTO = C.LIMITE_FOTO_GIORNALIERO;
+const MAX_IMMAGINE_BYTE = 2 * 1024 * 1024;
+const TIPI_IMMAGINE = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_TOKEN_TESTO = 1500;
 const MAX_TOKEN_SCHEDA = 2500;
+const MAX_TOKEN_FOTO = 1000;
 
 let clienteAi = null;
 
@@ -41,24 +47,25 @@ function cliente() {
 // --- Limite giornaliero -----------------------------------------------------
 
 // Incrementa il contatore solo se c e ancora spazio: il controllo e atomico.
-async function consumaRichiesta(userId) {
+// Le analisi delle foto hanno un tipo a parte, quindi un limite tutto loro.
+async function consumaRichiesta(userId, tipo, limite) {
   const riga = await db.uno(
-    `INSERT INTO ai_usage (user_id, data, conteggio) VALUES ($1, CURRENT_DATE, 1)
-     ON CONFLICT (user_id, data) DO UPDATE SET conteggio = ai_usage.conteggio + 1
-        WHERE ai_usage.conteggio < $2
+    `INSERT INTO ai_usage (user_id, data, tipo, conteggio) VALUES ($1, CURRENT_DATE, $2, 1)
+     ON CONFLICT (user_id, data, tipo) DO UPDATE SET conteggio = ai_usage.conteggio + 1
+        WHERE ai_usage.conteggio < $3
      RETURNING conteggio`,
-    [userId, LIMITE]
+    [userId, tipo || 'generale', limite || LIMITE]
   );
   return riga ? riga.conteggio : null;
 }
 
 // Se la chiamata non e mai partita, il tentativo non va contato.
-async function rimborsaRichiesta(userId) {
+async function rimborsaRichiesta(userId, tipo) {
   await db
     .query(
       `UPDATE ai_usage SET conteggio = GREATEST(0, conteggio - 1)
-        WHERE user_id = $1 AND data = CURRENT_DATE`,
-      [userId]
+        WHERE user_id = $1 AND data = CURRENT_DATE AND tipo = $2`,
+      [userId, tipo || 'generale']
     )
     .catch(function (err) {
       console.error('[ai] impossibile rimborsare la richiesta:', err.message);
@@ -66,12 +73,22 @@ async function rimborsaRichiesta(userId) {
 }
 
 async function usoOggi(userId) {
-  const riga = await db.uno(
-    'SELECT conteggio FROM ai_usage WHERE user_id = $1 AND data = CURRENT_DATE',
+  const righe = await db.tutte(
+    'SELECT tipo, conteggio FROM ai_usage WHERE user_id = $1 AND data = CURRENT_DATE',
     [userId]
   );
-  const usate = riga ? Number(riga.conteggio) : 0;
-  return { usate, limite: LIMITE, restanti: Math.max(0, LIMITE - usate) };
+  const per = {};
+  for (const r of righe) per[r.tipo] = Number(r.conteggio);
+  const usate = per.generale || 0;
+  const foto = per.foto || 0;
+  return {
+    usate,
+    limite: LIMITE,
+    restanti: Math.max(0, LIMITE - usate),
+    foto_usate: foto,
+    foto_limite: LIMITE_FOTO,
+    foto_restanti: Math.max(0, LIMITE_FOTO - foto),
+  };
 }
 
 // --- Chiamata al modello ----------------------------------------------------
@@ -153,8 +170,12 @@ async function contestoUtente(userId) {
     [userId]
   );
 
+  // Solo i totali degli ultimi 7 giorni: nessuna immagine lascia mai il server.
+  const giorniDiario = await diario.ultimiGiorni(userId, 7);
+
   const contestoEsercizi = generatore.contestoDaProfilo(profilo);
   return {
+    diario: diario.riepilogoSettimana(giorniDiario),
     profilo,
     riepilogo: calcoli.riepilogo(profilo),
     // Serve sia alla rotta alimentazione sia alla chat, che puo parlare di cibo.
@@ -309,7 +330,7 @@ router.get('/storico', async (req, res, next) => {
 });
 
 // Controlli comuni a tutte le rotte che chiamano il modello.
-async function preparaChiamata(req, res) {
+async function preparaChiamata(req, res, opzioni) {
   if (!aiConfigurata()) {
     res.status(503).json({ errore: 'AI non configurata', configurata: false });
     return null;
@@ -319,16 +340,20 @@ async function preparaChiamata(req, res) {
     res.status(400).json({ errore: 'Prima compila il profilo: al coach servono i tuoi dati.' });
     return null;
   }
-  const conteggio = await consumaRichiesta(req.session.userId);
+  const tipo = opzioni && opzioni.tipo === 'foto' ? 'foto' : 'generale';
+  const limite = tipo === 'foto' ? LIMITE_FOTO : LIMITE;
+  const conteggio = await consumaRichiesta(req.session.userId, tipo, limite);
   if (conteggio === null) {
     res.status(429).json({
-      errore: 'Hai esaurito le ' + LIMITE + ' richieste AI di oggi. Riprova domani.',
+      errore: tipo === 'foto'
+        ? 'Hai esaurito le ' + LIMITE_FOTO + ' analisi foto di oggi. Riprova domani.'
+        : 'Hai esaurito le ' + LIMITE + ' richieste AI di oggi. Riprova domani.',
       restanti: 0,
-      limite: LIMITE,
+      limite,
     });
     return null;
   }
-  return { contesto, restanti: Math.max(0, LIMITE - conteggio) };
+  return { contesto, tipo, restanti: Math.max(0, limite - conteggio) };
 }
 
 // Analisi dei progressi.
@@ -345,7 +370,7 @@ router.post('/analisi', async (req, res, next) => {
       MAX_TOKEN_TESTO
     );
     if (!risposta.testo) {
-      await rimborsaRichiesta(req.session.userId);
+      await rimborsaRichiesta(req.session.userId, preparata ? preparata.tipo : 'generale');
       return res.status(502).json({ errore: 'Il coach non ha prodotto testo. Riprova.' });
     }
 
@@ -363,7 +388,7 @@ router.post('/analisi', async (req, res, next) => {
       token: { ingresso: risposta.uso.input_tokens || 0, uscita: risposta.uso.output_tokens || 0 },
     });
   } catch (err) {
-    await rimborsaRichiesta(req.session.userId);
+    await rimborsaRichiesta(req.session.userId, preparata ? preparata.tipo : 'generale');
     if (rispondiErroreAi(err, res)) return;
     next(err);
   }
@@ -378,7 +403,7 @@ router.post('/scheda', async (req, res, next) => {
     const contesto = preparata.contesto;
     const consentiti = ammessi(contesto);
     if (!consentiti.lista.length) {
-      await rimborsaRichiesta(req.session.userId);
+      await rimborsaRichiesta(req.session.userId, preparata ? preparata.tipo : 'generale');
       return res.status(400).json({ errore: 'Con questa attrezzatura e questi infortuni non trovo esercizi utilizzabili.' });
     }
 
@@ -423,7 +448,7 @@ router.post('/scheda', async (req, res, next) => {
       token: { ingresso: risposta.uso.input_tokens || 0, uscita: risposta.uso.output_tokens || 0 },
     });
   } catch (err) {
-    await rimborsaRichiesta(req.session.userId);
+    await rimborsaRichiesta(req.session.userId, preparata ? preparata.tipo : 'generale');
     if (rispondiErroreAi(err, res)) return;
     next(err);
   }
@@ -471,7 +496,7 @@ router.post('/alimentazione', async (req, res, next) => {
       MAX_TOKEN_TESTO
     );
     if (!risposta.testo) {
-      await rimborsaRichiesta(req.session.userId);
+      await rimborsaRichiesta(req.session.userId, preparata ? preparata.tipo : 'generale');
       return res.status(502).json({ errore: 'Il coach non ha prodotto testo. Riprova.' });
     }
 
@@ -489,7 +514,124 @@ router.post('/alimentazione', async (req, res, next) => {
       token: { ingresso: risposta.uso.input_tokens || 0, uscita: risposta.uso.output_tokens || 0 },
     });
   } catch (err) {
-    await rimborsaRichiesta(req.session.userId);
+    await rimborsaRichiesta(req.session.userId, preparata ? preparata.tipo : 'generale');
+    if (rispondiErroreAi(err, res)) return;
+    next(err);
+  }
+});
+
+// --- Analisi di una foto del pasto ------------------------------------------
+
+// Limiti realistici per un singolo pasto: quello che esce fuori scala viene riportato dentro.
+const LIMITI_PASTO = { calorie: 3000, proteine: 300, carboidrati: 600, grassi: 300 };
+
+function numeroInScala(valore, massimo) {
+  const n = Math.round(Number(valore));
+  if (!isFinite(n) || n < 0) return 0;
+  return Math.min(massimo, n);
+}
+
+// Controlla la risposta del modello e la riporta in un formato sicuro.
+function validaPastoAi(oggetto) {
+  if (!oggetto || typeof oggetto !== 'object') {
+    return { ok: false, errore: 'La risposta non contiene i dati del pasto.' };
+  }
+
+  const descrizione = String(oggetto.descrizione || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+  if (!descrizione) return { ok: false, errore: 'Il coach non ha riconosciuto il piatto.' };
+
+  const alimenti = (Array.isArray(oggetto.alimenti) ? oggetto.alimenti : [])
+    .slice(0, 15)
+    .map(function (a) {
+      const nome = String((a && a.nome) || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+      if (!nome) return null;
+      return { nome, porzione_g: numeroInScala(a && a.porzione_g, 2000) };
+    })
+    .filter(Boolean);
+
+  const confidenza = String(oggetto.confidenza || '').toLowerCase().trim();
+
+  return {
+    ok: true,
+    bozza: {
+      descrizione,
+      alimenti,
+      calorie: numeroInScala(oggetto.calorie, LIMITI_PASTO.calorie),
+      proteine: numeroInScala(oggetto.proteine, LIMITI_PASTO.proteine),
+      carboidrati: numeroInScala(oggetto.carboidrati, LIMITI_PASTO.carboidrati),
+      grassi: numeroInScala(oggetto.grassi, LIMITI_PASTO.grassi),
+      confidenza: ['bassa', 'media', 'alta'].indexOf(confidenza) !== -1 ? confidenza : 'bassa',
+      fonte: 'foto_ai',
+    },
+  };
+}
+
+// La foto viene guardata e basta: non viene salvata da nessuna parte.
+// A salvare la miniatura da 200px ci pensa il diario, se l utente conferma.
+router.post('/pasto', async (req, res, next) => {
+  const grezza = String((req.body && req.body.immagine) || '').replace(/^data:image\/[a-z+]+;base64,/, '');
+  if (!grezza) return res.status(400).json({ errore: 'Manca l immagine da analizzare.' });
+
+  let immagine = null;
+  try {
+    immagine = Buffer.from(grezza, 'base64');
+  } catch (err) {
+    immagine = null;
+  }
+  if (!immagine || !immagine.length) {
+    return res.status(400).json({ errore: 'Immagine non leggibile.' });
+  }
+  if (immagine.length > MAX_IMMAGINE_BYTE) {
+    return res.status(413).json({ errore: 'La foto supera i 2 MB: riprova, verra ridotta automaticamente.' });
+  }
+  const tipo = tipoImmagine(immagine);
+  if (!tipo || TIPI_IMMAGINE.indexOf(tipo) === -1) {
+    return res.status(415).json({ errore: 'Formato non supportato: servono JPEG, PNG o WebP.' });
+  }
+
+  const preparata = await preparaChiamata(req, res, { tipo: 'foto' }).catch(function (err) { next(err); return null; });
+  if (!preparata) return;
+
+  try {
+    const contesto = preparata.contesto;
+    const risposta = await chiamaClaude(
+      'foto pasto',
+      prompt.sistemaFoto(contesto.nutrizione),
+      [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: tipo, data: immagine.toString('base64') } },
+          { type: 'text', text: 'Stima il contenuto di questo pasto e rispondi solo con il JSON richiesto.' },
+        ],
+      }],
+      MAX_TOKEN_FOTO
+    );
+
+    let oggetto = null;
+    try {
+      oggetto = JSON.parse(estraiJson(risposta.testo));
+    } catch (err) {
+      console.error('[ai] foto pasto: JSON non valido (' + err.message + ')');
+      return res.status(422).json({
+        errore: 'Il coach ha risposto in un formato non valido. Riprova o inserisci il pasto a mano.',
+        restanti: preparata.restanti,
+      });
+    }
+
+    const esito = validaPastoAi(oggetto);
+    if (!esito.ok) {
+      return res.status(422).json({ errore: esito.errore, restanti: preparata.restanti });
+    }
+
+    res.json({
+      ok: true,
+      bozza: esito.bozza,
+      restanti: preparata.restanti,
+      limite: LIMITE_FOTO,
+      token: { ingresso: risposta.uso.input_tokens || 0, uscita: risposta.uso.output_tokens || 0 },
+    });
+  } catch (err) {
+    await rimborsaRichiesta(req.session.userId, 'foto');
     if (rispondiErroreAi(err, res)) return;
     next(err);
   }
@@ -524,7 +666,7 @@ router.post('/chat', async (req, res, next) => {
 
     const risposta = await chiamaClaude('chat', prompt.sistemaChat(), messaggi, MAX_TOKEN_TESTO);
     if (!risposta.testo) {
-      await rimborsaRichiesta(req.session.userId);
+      await rimborsaRichiesta(req.session.userId, preparata ? preparata.tipo : 'generale');
       return res.status(502).json({ errore: 'Il coach non ha risposto. Riprova.' });
     }
 
@@ -536,7 +678,7 @@ router.post('/chat', async (req, res, next) => {
       token: { ingresso: risposta.uso.input_tokens || 0, uscita: risposta.uso.output_tokens || 0 },
     });
   } catch (err) {
-    await rimborsaRichiesta(req.session.userId);
+    await rimborsaRichiesta(req.session.userId, preparata ? preparata.tipo : 'generale');
     if (rispondiErroreAi(err, res)) return;
     next(err);
   }
@@ -544,5 +686,6 @@ router.post('/chat', async (req, res, next) => {
 
 module.exports = router;
 module.exports.validaSchedaAi = validaSchedaAi;
+module.exports.validaPastoAi = validaPastoAi;
 module.exports.estraiJson = estraiJson;
 module.exports.normalizza = normalizza;

@@ -8,7 +8,7 @@
 
    La versione va aumentata a ogni rilascio che tocca i file statici: in
    "activate" tutte le cache con un nome diverso vengono buttate via. */
-const VERSIONE = 'v5';
+const VERSIONE = 'v6';
 const CACHE = 'allenamento-' + VERSIONE;
 
 const STATICI = [

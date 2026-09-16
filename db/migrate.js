@@ -76,6 +76,44 @@ const SQL = [
   `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS allergie TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS pasti_giorno INTEGER NOT NULL DEFAULT 4`,
 
+  // Diario dell acqua: piu registrazioni nello stesso giorno si sommano.
+  `CREATE TABLE IF NOT EXISTS water_logs (
+     id         SERIAL PRIMARY KEY,
+     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     data       DATE NOT NULL DEFAULT CURRENT_DATE,
+     ml         INTEGER NOT NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   )`,
+
+  `CREATE INDEX IF NOT EXISTS water_logs_user_idx ON water_logs (user_id, data DESC)`,
+
+  // Diario dei pasti. La miniatura e piccola e sta nel database: su Railway il
+  // filesystem viene ricreato a ogni rilascio, quindi non si salva nulla su disco.
+  `CREATE TABLE IF NOT EXISTS meal_logs (
+     id          SERIAL PRIMARY KEY,
+     user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     data        DATE NOT NULL DEFAULT CURRENT_DATE,
+     tipo_pasto  TEXT NOT NULL,
+     descrizione TEXT NOT NULL DEFAULT '',
+     calorie     INTEGER NOT NULL DEFAULT 0,
+     proteine    INTEGER NOT NULL DEFAULT 0,
+     carboidrati INTEGER NOT NULL DEFAULT 0,
+     grassi      INTEGER NOT NULL DEFAULT 0,
+     fonte       TEXT NOT NULL DEFAULT 'manuale',
+     confidenza  TEXT,
+     thumbnail   BYTEA,
+     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+   )`,
+
+  `CREATE INDEX IF NOT EXISTS meal_logs_user_idx ON meal_logs (user_id, data DESC)`,
+
+  // Il contatore AI ora distingue i tipi di richiesta: le analisi foto hanno un
+  // limite separato. La vecchia chiave primaria viene sostituita da un indice
+  // unico sui tre campi, cosi la migrazione resta ripetibile senza errori.
+  `ALTER TABLE ai_usage ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'generale'`,
+  `ALTER TABLE ai_usage DROP CONSTRAINT IF EXISTS ai_usage_pkey`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS ai_usage_chiave_idx ON ai_usage (user_id, data, tipo)`,
+
   // Copia di sicurezza creata prima di ogni azzeramento o eliminazione dal pannello admin.
   `CREATE TABLE IF NOT EXISTS admin_backups (
      id         SERIAL PRIMARY KEY,

@@ -233,9 +233,11 @@
   }
 
   function vibra(schema) {
-    if (navigator && typeof navigator.vibrate === 'function') {
-      try { navigator.vibrate(schema); } catch (err) { /* non supportato */ }
-    }
+    if (!navigator || typeof navigator.vibrate !== 'function') return;
+    // Senza un tocco vero il browser rifiuta la vibrazione e sporca la console.
+    const attivazione = navigator.userActivation;
+    if (attivazione && attivazione.isActive === false) return;
+    try { navigator.vibrate(schema); } catch (err) { /* non supportato */ }
   }
 
   function animazioniRidotte() {
@@ -398,11 +400,57 @@
     });
   }
 
+
+  // --- Immagini -----------------------------------------------------------------
+
+  // Ridimensiona una foto nel browser prima di spedirla: al server arriva sempre
+  // un JPEG piccolo, mai il file originale da diversi megabyte.
+  function ridimensionaImmagine(file, latoMax, qualita) {
+    return new Promise(function (risolvi, rifiuta) {
+      if (!file) return rifiuta(new Error('Nessun file scelto.'));
+      const lettore = new FileReader();
+      lettore.onerror = function () { rifiuta(new Error('Non riesco a leggere il file.')); };
+      lettore.onload = function () {
+        const immagine = new Image();
+        immagine.onerror = function () { rifiuta(new Error('Il file non sembra un immagine.')); };
+        immagine.onload = function () {
+          const lato = Math.max(immagine.width, immagine.height) || 1;
+          const scala = Math.min(1, (latoMax || 1024) / lato);
+          const larghezza = Math.max(1, Math.round(immagine.width * scala));
+          const altezza = Math.max(1, Math.round(immagine.height * scala));
+          const tela = document.createElement('canvas');
+          tela.width = larghezza;
+          tela.height = altezza;
+          const contesto = tela.getContext('2d');
+          contesto.fillStyle = '#ffffff';
+          contesto.fillRect(0, 0, larghezza, altezza);
+          contesto.drawImage(immagine, 0, 0, larghezza, altezza);
+          let dataUrl;
+          try {
+            dataUrl = tela.toDataURL('image/jpeg', qualita || 0.7);
+          } catch (err) {
+            return rifiuta(new Error('Non riesco a elaborare l immagine.'));
+          }
+          const base64 = dataUrl.split(',')[1] || '';
+          risolvi({
+            dataUrl: dataUrl,
+            base64: base64,
+            larghezza: larghezza,
+            altezza: altezza,
+            byte: Math.round(base64.length * 0.75),
+          });
+        };
+        immagine.src = lettore.result;
+      };
+      lettore.readAsDataURL(file);
+    });
+  }
+
   window.App = {
     api, mostra, pulisci, occupato, toast,
     tema, impostaTema, alternaTema, collegaTema,
     icone, scheletro, iniziale, coloreAvatar, avatarHtml,
     testoSicuro, dataIta, giornoSettimana, oggiISO, numero, vibra, animazioniRidotte,
-    apriScheda, chiudiScheda, collegaSchede,
+    apriScheda, chiudiScheda, collegaSchede, ridimensionaImmagine,
   };
 })();

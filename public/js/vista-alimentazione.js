@@ -170,12 +170,223 @@
       'Con patologie, in gravidanza o allattamento, o se prendi farmaci, parlane prima con un medico.</p></div>';
   }
 
+  // --- Diario di oggi -----------------------------------------------------------
+
+  const ETICHETTE_PASTO = {
+    colazione: 'Colazione', pranzo: 'Pranzo', cena: 'Cena',
+    spuntino: 'Spuntino', pre: 'Pre allenamento', post: 'Post allenamento',
+  };
+
+  // Bozza in lavorazione: dati stimati dall AI piu la miniatura da salvare.
+  let bozzaPasto = null;
+
+  function listaPastiHtml(pasti) {
+    if (!pasti.length) return '<p class="aiuto">Non hai ancora registrato pasti oggi.</p>';
+    let html = '';
+    for (const p of pasti) {
+      html += '<div class="riga-pasto" data-pasto="' + p.id + '">';
+      html += p.ha_foto
+        ? '<img class="miniatura" src="/api/diario/pasto/' + p.id + '/foto" alt="" loading="lazy">'
+        : '<span class="miniatura vuota" aria-hidden="true"><i data-lucide="utensils"></i></span>';
+      html += '<div class="testo-pasto"><strong>' + App.testoSicuro(ETICHETTE_PASTO[p.tipo_pasto] || p.tipo_pasto) + '</strong>' +
+        (p.fonte === 'foto_ai' ? '<span class="tag">da foto</span>' : '') +
+        (p.confidenza ? '<span class="tag">' + App.testoSicuro(p.confidenza) + '</span>' : '') +
+        '<p class="aiuto">' + App.testoSicuro(p.descrizione) + '</p>' +
+        '<span class="stato">' + App.numero(p.calorie, 0) + ' kcal &middot; P ' + p.proteine +
+        ' &middot; C ' + p.carboidrati + ' &middot; G ' + p.grassi + '</span></div>';
+      html += '<button type="button" class="btn-contorno btn-icona" data-elimina-pasto="' + p.id +
+        '" aria-label="Elimina questo pasto"><i data-lucide="trash-2"></i></button>';
+      html += '</div>';
+    }
+    return html;
+  }
+
+  function moduloPastoHtml(valori, conFoto) {
+    const v = valori || {};
+    let html = '<div class="card" id="modulo-pasto">';
+    html += '<div class="card-testa"><h3>' + (conFoto ? 'Controlla e correggi' : 'Aggiungi un pasto') + '</h3>' +
+      (v.confidenza ? '<span class="tag ' + (v.confidenza === 'alta' ? 'verde' : 'acceso') + '">stima ' +
+        App.testoSicuro(v.confidenza) + '</span>' : '') + '</div>';
+    if (conFoto) {
+      html += '<p class="aiuto" style="margin-top:0">Sono stime a occhio: correggi quello che non torna prima di salvare.</p>';
+    }
+    if (v.anteprima) {
+      html += '<img class="anteprima-foto" src="' + v.anteprima + '" alt="Foto del pasto">';
+    }
+    if (Array.isArray(v.alimenti) && v.alimenti.length) {
+      html += '<p class="etichetta">Alimenti riconosciuti</p><ul class="elenco-scheda">';
+      for (const a of v.alimenti) {
+        html += '<li>' + App.testoSicuro(a.nome) + (a.porzione_g ? ' - circa ' + a.porzione_g + ' g' : '') + '</li>';
+      }
+      html += '</ul>';
+    }
+
+    html += '<div class="campo"><label>Tipo di pasto</label>' +
+      '<div class="scelte-card" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr))">';
+    for (const tipo of Object.keys(ETICHETTE_PASTO)) {
+      const attivo = (v.tipo_pasto || 'pranzo') === tipo;
+      html += '<button type="button" class="scelta" style="justify-content:center" data-tipo-pasto="' + tipo +
+        '" aria-pressed="' + attivo + '"><span>' + ETICHETTE_PASTO[tipo] + '</span></button>';
+    }
+    html += '</div></div>';
+
+    html += '<div class="campo"><label for="pasto-descrizione">Che cosa hai mangiato</label>' +
+      '<input type="text" id="pasto-descrizione" maxlength="300" value="' + App.testoSicuro(v.descrizione || '') + '"></div>';
+    html += '<div class="griglia-2">' +
+      '<div class="campo"><label for="pasto-calorie">Calorie</label><input type="number" id="pasto-calorie" inputmode="numeric" min="0" max="3000" value="' + (v.calorie || 0) + '"></div>' +
+      '<div class="campo"><label for="pasto-proteine">Proteine (g)</label><input type="number" id="pasto-proteine" inputmode="numeric" min="0" max="300" value="' + (v.proteine || 0) + '"></div>' +
+      '<div class="campo"><label for="pasto-carboidrati">Carboidrati (g)</label><input type="number" id="pasto-carboidrati" inputmode="numeric" min="0" max="600" value="' + (v.carboidrati || 0) + '"></div>' +
+      '<div class="campo"><label for="pasto-grassi">Grassi (g)</label><input type="number" id="pasto-grassi" inputmode="numeric" min="0" max="300" value="' + (v.grassi || 0) + '"></div>' +
+      '</div>';
+    html += '<div class="riga-bottoni"><button type="button" class="btn-principale" id="salva-pasto" style="flex:1">' +
+      '<i data-lucide="check"></i> Salva</button>' +
+      '<button type="button" class="btn-contorno" id="scarta-pasto">Scarta</button></div>';
+    html += '</div>';
+    return html;
+  }
+
+  function diarioHtml(diarioOggi, aiConfigurata, restantiFoto) {
+    let html = '<div class="card card-accento"><div class="card-testa">' +
+      '<h2><i data-lucide="notebook-pen"></i> Diario di oggi</h2>' +
+      '<span class="badge-serie">' + App.numero(diarioOggi.totali.calorie, 0) + ' kcal</span></div>';
+
+    html += '<div class="riga-bottoni">';
+    if (aiConfigurata) {
+      html += '<button type="button" class="btn-principale" id="apri-foto" style="flex:1 1 170px">' +
+        '<i data-lucide="camera"></i> Foto del pasto</button>';
+    }
+    html += '<button type="button" class="btn-contorno" id="apri-manuale" style="flex:1 1 150px">' +
+      '<i data-lucide="pencil"></i> Inserisci a mano</button></div>';
+    html += '<input type="file" id="foto-pasto" accept="image/*" capture="environment" class="nascosto">';
+    if (aiConfigurata) {
+      html += '<p class="aiuto">Analisi foto rimaste oggi: ' + restantiFoto + '.</p>';
+    }
+    html += '<div id="area-pasto"></div>';
+    html += '<p class="etichetta-sezione" style="margin-top:var(--s-4)">Pasti di oggi</p>';
+    html += '<div id="lista-pasti">' + listaPastiHtml(diarioOggi.pasti) + '</div>';
+    html += '</div>';
+    return html;
+  }
+
+  function collegaDiario(el, ricarica) {
+    const area = document.getElementById('area-pasto');
+    const input = document.getElementById('foto-pasto');
+
+    function chiudiModulo() {
+      bozzaPasto = null;
+      if (area) area.innerHTML = '';
+    }
+
+    function apriModulo(valori, conFoto) {
+      area.innerHTML = moduloPastoHtml(valori, conFoto);
+      App.icone();
+      bozzaPasto = Object.assign({ tipo_pasto: 'pranzo' }, valori || {});
+
+      area.querySelectorAll('[data-tipo-pasto]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          bozzaPasto.tipo_pasto = b.dataset.tipoPasto;
+          area.querySelectorAll('[data-tipo-pasto]').forEach(function (altro) {
+            altro.setAttribute('aria-pressed', String(altro === b));
+          });
+        });
+      });
+
+      document.getElementById('scarta-pasto').addEventListener('click', function () {
+        chiudiModulo();
+        App.toast('Bozza scartata', 'info', 1400);
+      });
+
+      document.getElementById('salva-pasto').addEventListener('click', async function () {
+        const bottone = document.getElementById('salva-pasto');
+        App.occupato(bottone, true, 'Salvo...');
+        try {
+          await App.api('POST', '/api/diario/pasto', {
+            tipo_pasto: bozzaPasto.tipo_pasto,
+            descrizione: document.getElementById('pasto-descrizione').value,
+            calorie: document.getElementById('pasto-calorie').value,
+            proteine: document.getElementById('pasto-proteine').value,
+            carboidrati: document.getElementById('pasto-carboidrati').value,
+            grassi: document.getElementById('pasto-grassi').value,
+            fonte: bozzaPasto.fonte || 'manuale',
+            confidenza: bozzaPasto.confidenza || null,
+            thumbnail: bozzaPasto.thumbnail || null,
+          });
+          chiudiModulo();
+          App.toast('Pasto registrato', 'ok');
+          await ricarica();
+        } catch (err) {
+          App.occupato(bottone, false);
+          App.toast(err.message, 'errore');
+        }
+      });
+    }
+
+    const apriFoto = document.getElementById('apri-foto');
+    if (apriFoto && input) {
+      apriFoto.addEventListener('click', function () { input.click(); });
+      input.addEventListener('change', async function () {
+        const file = input.files && input.files[0];
+        input.value = '';
+        if (!file) return;
+
+        App.occupato(apriFoto, true, 'Analizzo...');
+        area.innerHTML = App.scheletro(3);
+        try {
+          // Una copia ridotta per l analisi e una molto piccola da conservare.
+          const grande = await App.ridimensionaImmagine(file, 1024, 0.7);
+          const piccola = await App.ridimensionaImmagine(file, 200, 0.7);
+          const dati = await App.api('POST', '/api/ai/pasto', { immagine: grande.base64 });
+          apriModulo(Object.assign({}, dati.bozza, {
+            anteprima: piccola.dataUrl,
+            thumbnail: piccola.base64,
+          }), true);
+          App.toast('Ecco la stima: controllala prima di salvare', 'ok');
+        } catch (err) {
+          area.innerHTML = '';
+          App.toast(err.message, 'errore');
+        } finally {
+          App.occupato(apriFoto, false);
+          App.icone();
+        }
+      });
+    }
+
+    const apriManuale = document.getElementById('apri-manuale');
+    if (apriManuale) {
+      apriManuale.addEventListener('click', function () {
+        apriModulo({ tipo_pasto: 'pranzo', fonte: 'manuale' }, false);
+        const campo = document.getElementById('pasto-descrizione');
+        if (campo) campo.focus();
+      });
+    }
+
+    el.querySelectorAll('[data-elimina-pasto]').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        App.occupato(b, true, '...');
+        try {
+          await App.api('DELETE', '/api/diario/pasto/' + b.dataset.eliminaPasto);
+          App.toast('Pasto eliminato', 'info', 1400);
+          await ricarica();
+        } catch (err) {
+          App.occupato(b, false);
+          App.toast(err.message, 'errore');
+        }
+      });
+    });
+  }
+
   Viste.alimentazione = {
     async mostra(el) {
-      const dati = (await App.api('GET', '/api/alimentazione')).alimentazione;
+      const [risposta, diarioOggi, statoAi] = await Promise.all([
+        App.api('GET', '/api/alimentazione'),
+        App.api('GET', '/api/diario/oggi'),
+        App.api('GET', '/api/ai/stato').catch(function () { return { configurata: false, foto_restanti: 0 }; }),
+      ]);
+      const dati = risposta.alimentazione;
       const s = dati.suggerimenti;
 
-      let html = '<div class="card"><div class="card-testa"><h2><i data-lucide="salad"></i> I tuoi numeri</h2>';
+      let html = diarioHtml(diarioOggi, Boolean(statoAi.configurata), statoAi.foto_restanti);
+      html += '<div class="card"><div class="card-testa"><h2><i data-lucide="salad"></i> I tuoi numeri</h2>';
       if (dati.preferenze.length) {
         html += '<span class="tag verde">' + App.testoSicuro(dati.preferenze.join(', ')) + '</span>';
       }
@@ -197,6 +408,7 @@
       html += avvertenzaHtml();
       el.innerHTML = html;
       App.icone();
+      collegaDiario(el, function () { return Viste.alimentazione.mostra(el); });
 
       el.querySelectorAll('[data-altre]').forEach(function (b) {
         b.addEventListener('click', function () {
