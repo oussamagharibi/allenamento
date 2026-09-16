@@ -108,6 +108,7 @@ app.use('/api/esercizi', require('./routes/esercizi'));
 app.use('/api/alimentazione', require('./routes/alimentazione'));
 app.use('/api/diario', require('./routes/diario'));
 app.use('/api/musica', require('./routes/musica'));
+app.use('/api/spotify', require('./routes/spotify'));
 app.use('/api/progressi', require('./routes/progressi'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/admin', require('./routes/admin'));
@@ -136,6 +137,10 @@ async function avvia() {
   console.log(`[avvio] AI: ${process.env.ANTHROPIC_API_KEY ? 'configurata' : 'non configurata'}`);
   if (process.env.ADMIN_PASSWORD) console.log('[avvio] pannello admin attivo su /admin');
   else console.log('[admin] disattivato');
+  // Mai stampare i valori: solo il nome di cio che manca.
+  const spotify = require('./lib/spotify');
+  if (spotify.configurato()) console.log('[avvio] Spotify: collegamento attivo');
+  else console.log('[avvio] Spotify: spento (mancano ' + spotify.motivoSpento().join(', ') + ')');
   try {
     await migra();
   } catch (err) {

@@ -267,6 +267,7 @@
     html += '</div>';
 
     html += esercizioHtml(e);
+    html += '<div id="area-in-ascolto" data-in-ascolto data-allenamento="' + corrente.id + '"></div>';
 
     html += '<div class="card"><div class="riga-bottoni">';
     html += '<button type="button" class="btn-contorno" data-azione="prec"' + (indice === 0 ? ' disabled' : '') + '>' +
@@ -283,6 +284,8 @@
     contenitore.innerHTML = html;
     App.icone();
     App.collegaSchede(contenitore);
+    // Durante la seduta il brano viene anche legato a questo allenamento.
+    if (window.Spotify) window.Spotify.montaInAscolto(document.getElementById('area-in-ascolto'), corrente.id);
   }
 
   // --- Azioni -----------------------------------------------------------------
@@ -351,7 +354,13 @@
       const azione = bottone.dataset.azione;
       const e = corrente.esercizi[indice];
 
-      if (azione === 'esci') { inSessione = false; chiudiTimer(); Viste.allenamento.mostra(contenitore, corrente.id); return; }
+      if (azione === 'esci') {
+        inSessione = false;
+        chiudiTimer();
+        if (window.Spotify) window.Spotify.fermaAscolto();
+        Viste.allenamento.mostra(contenitore, corrente.id);
+        return;
+      }
       if (azione === 'prec') { indice = Math.max(0, indice - 1); disegnaSessione(); return; }
       if (azione === 'succ') { indice = Math.min(corrente.esercizi.length - 1, indice + 1); disegnaSessione(); return; }
       if (azione === 'timer') { avviaTimer(e.recupero, 'Recupero'); return; }

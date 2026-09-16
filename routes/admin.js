@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const db = require('../db');
 const C = require('../lib/costanti');
 const musica = require('../lib/musica');
+const spotify = require('../lib/spotify');
 const { requireAdmin, adminAbilitato, adminValido, rinnovaAdmin, scollegaAdmin, DURATA_ADMIN } = require('../middleware/auth');
 
 const router = express.Router();
@@ -123,6 +124,7 @@ router.get('/utenti', async (req, res, next) => {
               (SELECT COUNT(*) FROM meal_logs m WHERE m.user_id = u.id)::int AS pasti_registrati,
               (SELECT COUNT(*) FROM water_logs a WHERE a.user_id = u.id)::int AS registrazioni_acqua,
               (SELECT COUNT(*) FROM music_prefs m WHERE m.user_id = u.id)::int AS scelte_musica,
+              EXISTS(SELECT 1 FROM spotify_tokens s WHERE s.user_id = u.id) AS spotify_collegato,
               COALESCE((SELECT a.conteggio FROM ai_usage a
                          WHERE a.user_id = u.id AND a.data = CURRENT_DATE), 0)::int AS ai_oggi,
               EXISTS(SELECT 1 FROM profiles p WHERE p.user_id = u.id) AS profilo
@@ -191,6 +193,39 @@ router.get('/utenti/:id/musica', async (req, res, next) => {
       ),
     ]);
 
+    // Ascolti: solo se l utente ha collegato Spotify, altrimenti restano vuoti.
+    const [artisti, duranteAllenamento, recenti] = await Promise.all([
+      db.tutte(
+        `SELECT artist, COUNT(*)::int AS n FROM listening_logs
+          WHERE user_id = $1 AND artist <> '' GROUP BY 1 ORDER BY n DESC, artist ASC LIMIT 8`,
+        [id]
+      ),
+      db.tutte(
+        `SELECT l.id, l.track_name, l.artist, l.album_image, l.played_at,
+                w.titolo AS allenamento, w.data AS giorno
+           FROM listening_logs l JOIN workouts w ON w.id = l.workout_id
+          WHERE l.user_id = $1 ORDER BY l.played_at DESC, l.id DESC LIMIT 20`,
+        [id]
+      ),
+      db.tutte(
+        `SELECT id, track_name, artist, album_image, workout_id, played_at
+           FROM listening_logs WHERE user_id = $1 ORDER BY played_at DESC, id DESC LIMIT 10`,
+        [id]
+      ),
+    ]);
+
+    let inAscolto = null;
+    let avvisoAscolto = null;
+    if (spotify.configurato() && (await spotify.collegato(id))) {
+      try {
+        inAscolto = await spotify.inAscolto(id);
+      } catch (err) {
+        avvisoAscolto = err instanceof spotify.ErroreSpotify
+          ? err.message
+          : 'Non riesco a leggere cosa sta ascoltando.';
+      }
+    }
+
     const conEtichetta = function (righe, gruppo) {
       return righe.map(function (r) {
         return { valore: r.valore, etichetta: musica.etichetta(gruppo, r.valore), n: r.n };
@@ -216,6 +251,15 @@ router.get('/utenti/:id/musica', async (req, res, next) => {
       mood_possibili: musica.MOOD_VALIDI.map(function (m) {
         return { valore: m, etichetta: musica.etichetta('mood', m) };
       }),
+      spotify: {
+        configurato: spotify.configurato(),
+        collegato: spotify.configurato() ? await spotify.collegato(id) : false,
+        in_ascolto: inAscolto,
+        avviso: avvisoAscolto,
+        artisti,
+        durante_allenamento: duranteAllenamento,
+        recenti,
+      },
     });
   } catch (err) {
     next(err);
@@ -280,6 +324,12 @@ async function raccogliDati(esecutore, userId) {
     'SELECT id, user_id, mood, stile, paese, query, piattaforma, created_at FROM music_events WHERE user_id = $1 ORDER BY created_at ASC, id ASC',
     [userId]
   )).rows;
+  // Gli ascolti si esportano; i token di Spotify no, mai.
+  const ascolti = (await esecutore.query(
+    `SELECT id, user_id, track_id, track_name, artist, album_image, workout_id, played_at
+       FROM listening_logs WHERE user_id = $1 ORDER BY played_at ASC, id ASC`,
+    [userId]
+  )).rows;
   return {
     versione: 1,
     esportato_il: new Date().toISOString(),
@@ -293,6 +343,7 @@ async function raccogliDati(esecutore, userId) {
     meal_logs: pasti,
     music_prefs: sceltaMusica,
     music_events: eventiMusica,
+    listening_logs: ascolti,
   };
 }
 
@@ -332,6 +383,7 @@ async function salvaBackup(client, userId) {
 }
 
 async function cancellaDati(client, userId) {
+  await client.query('DELETE FROM listening_logs WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM music_events WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM music_prefs WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM water_logs WHERE user_id = $1', [userId]);
@@ -383,6 +435,8 @@ router.post('/utenti/:id/reset', async (req, res, next) => {
 });
 
 // Elimina utente e dati: libera un posto sugli 8 disponibili.
+// I token di Spotify vengono eliminati esplicitamente qui dentro, oltre al
+// vincolo ON DELETE CASCADE che li toglierebbe comunque.
 router.delete('/utenti/:id', async (req, res, next) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) return res.status(400).json({ errore: 'Utente non valido.' });
@@ -402,7 +456,9 @@ router.delete('/utenti/:id', async (req, res, next) => {
 
     const backup = await salvaBackup(client, id);
     await cancellaSessioni(client, id);
-    // Le tabelle collegate hanno ON DELETE CASCADE.
+    // I token di Spotify si tolgono per primi, senza affidarsi al vincolo.
+    await client.query('DELETE FROM spotify_tokens WHERE user_id = $1', [id]);
+    // Le altre tabelle collegate hanno ON DELETE CASCADE.
     await client.query('DELETE FROM users WHERE id = $1', [id]);
     await registraLog(client, 'elimina utente', utente.name);
     await client.query('COMMIT');
@@ -661,6 +717,17 @@ router.post('/backup/:id/ripristina', async (req, res, next) => {
       );
     }
 
+    for (const riga of Array.isArray(dati.listening_logs) ? dati.listening_logs : []) {
+      await client.query(
+        `INSERT INTO listening_logs (user_id, track_id, track_name, artist, album_image, played_at)
+              VALUES ($1, $2, $3, $4, $5, COALESCE($6::timestamptz, now()))`,
+        [
+          utente.id, riga.track_id || null, riga.track_name || '', riga.artist || '',
+          riga.album_image || null, riga.played_at || null,
+        ]
+      );
+    }
+
     await registraLog(client, 'ripristina backup', nome + ' (backup ' + backup.id + ')');
     await client.query('COMMIT');
     res.json({
@@ -675,6 +742,7 @@ router.post('/backup/:id/ripristina', async (req, res, next) => {
         acqua: (dati.water_logs || []).length,
         pasti: (dati.meal_logs || []).length,
         scelte_musica: (dati.music_prefs || []).length,
+        ascolti: (dati.listening_logs || []).length,
       },
     });
   } catch (err) {

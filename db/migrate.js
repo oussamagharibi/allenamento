@@ -160,6 +160,31 @@ const SQL = [
    )`,
 
   `CREATE INDEX IF NOT EXISTS music_events_utente_idx ON music_events (user_id, created_at DESC)`,
+
+  // --- Spotify: token cifrati e brani ascoltati -------------------------------
+
+  `CREATE TABLE IF NOT EXISTS spotify_tokens (
+     user_id       INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+     access_token  TEXT NOT NULL,
+     refresh_token TEXT NOT NULL,
+     expires_at    TIMESTAMPTZ NOT NULL,
+     scope         TEXT,
+     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+   )`,
+
+  `CREATE TABLE IF NOT EXISTS listening_logs (
+     id          SERIAL PRIMARY KEY,
+     user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     track_id    TEXT,
+     track_name  TEXT,
+     artist      TEXT,
+     album_image TEXT,
+     workout_id  INTEGER REFERENCES workouts(id) ON DELETE SET NULL,
+     played_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+   )`,
+
+  `CREATE INDEX IF NOT EXISTS listening_logs_utente_idx ON listening_logs (user_id, played_at DESC)`,
 ];
 
 async function migra() {

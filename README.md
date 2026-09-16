@@ -40,6 +40,8 @@ Variabili d'ambiente:
    - `ADMIN_PASSWORD` = master password del pannello admin (opzionale)
    - `ANTHROPIC_API_KEY` = la chiave Anthropic (opzionale)
    - `CLAUDE_MODEL` = `claude-sonnet-5` (opzionale)
+   - `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REDIRECT_URI`, `TOKEN_KEY`
+     (opzionali, ma o tutte e quattro o nessuna: vedi la sezione Musica)
    - `NODE_ENV` = `production`
 4. Railway usa `npm start` automaticamente; la porta arriva da `PORT`.
 5. In `Settings` → `Networking` premi `Generate Domain` per ottenere l'URL pubblico.
@@ -105,6 +107,53 @@ in `music_prefs`. Nel pannello admin ogni utente ha una scheda "Musica" con gli
 umori e gli stili piu frequenti, le ultime 20 scelte e un grafico degli umori
 settimana per settimana.
 `node scripts/verifica-musica.js` controlla ricerche, energia, frasi e validazione.
+
+### Collegamento a Spotify (opzionale)
+
+Si accende solo con tutte e quattro le variabili `SPOTIFY_CLIENT_ID`,
+`SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REDIRECT_URI` e `TOKEN_KEY`. Senza, la
+sezione Musica resta esattamente com'e e le rotte `/api/spotify/*` rispondono
+404: nessun errore, nessuna funzione che sparisce a meta.
+
+L'accesso usa Authorization Code con PKCE: il `code_verifier` e lo `state`
+anti-CSRF restano nella sessione sul server e non passano mai dal browser, e
+il client secret non viene inviato da nessuna parte (con PKCE non serve; e
+richiesto come variabile perche e la credenziale che identifica l'app nella
+dashboard di Spotify). Gli scope chiesti sono quattro, solo quelli che servono:
+lettura del brano in corso, dei brani recenti e dello stato di riproduzione,
+piu il comando di riproduzione.
+
+I token stanno in `spotify_tokens` cifrati con AES-256-GCM (chiave da
+`TOKEN_KEY`, 32 byte in esadecimale): nel database non c'e niente di leggibile,
+e il rinnovo avviene da solo un minuto prima della scadenza. Il pulsante
+"Collega Spotify" dice prima cosa comporta - il brano ascoltato sara visibile
+nell'app e all'amministratore - e "Scollega" cancella i token.
+
+Con l'account collegato la pagina Musica cerca anche le playlist vere
+(`search` con la ricerca della parte A, sei risultati, cache di 24 ore per
+ricerca e un massimo di 30 ricerche l'ora per utente). Ogni playlist si puo
+ascoltare dentro l'app in un iframe di open.spotify.com, che viene caricato
+solo quando lo si chiede, oppure far partire sul dispositivo attivo; se non
+c'e un dispositivo o manca Premium compare "Apri Spotify sul telefono e
+riprova" invece di un errore tecnico. Se l'account non e abilitato in User
+Management di Spotify il messaggio e "Il tuo account Spotify non e abilitato,
+chiedi all'amministratore".
+
+La card "In ascolto ora" (titolo, artista, copertina) compare in dashboard e
+durante la seduta, e si aggiorna ogni 30 secondi solo mentre la pagina e
+aperta e visibile. I brani finiscono in `listening_logs` senza ripetere due
+volte di fila lo stesso, e quelli ascoltati durante una seduta restano legati
+a quell'allenamento. Nel pannello admin, dentro la scheda "Musica", si vede
+cosa sta ascoltando l'utente, gli artisti piu ascoltati e i brani ascoltati
+durante gli allenamenti.
+
+Export e azzeramento comprendono `listening_logs`; i token non escono mai
+nell'esportazione e l'eliminazione di un utente li cancella. L'app non
+imposta una Content-Security-Policy: se in futuro se ne aggiunge una, vanno
+permessi `open.spotify.com` in `frame-src` e le immagini di
+`i.scdn.co` in `img-src`.
+`node scripts/verifica-spotify.js` controlla interruttore, cifratura, PKCE e
+messaggi di errore senza toccare la rete.
 
 ## Diario alimentare
 
@@ -176,9 +225,9 @@ finisce in `admin_log`. Se `ADMIN_PASSWORD` non e impostata, `/admin` risponde 4
 ```
 server.js           avvio, sessioni, rotte, migrazione
 db/                 pool PostgreSQL e migrazione
-lib/                calcoli, catalogo esercizi, generatore schede, nutrizione, diario, musica
+lib/                calcoli, catalogo esercizi, generatore schede, nutrizione, diario, musica, spotify
 middleware/auth.js  protezione sito + utente
-routes/             auth, profilo, allenamenti, progressi, alimentazione, diario, musica, AI
+routes/             auth, profilo, allenamenti, progressi, alimentazione, diario, musica, spotify, AI
 public/             frontend (HTML/CSS/JS vanilla)
 ```
 

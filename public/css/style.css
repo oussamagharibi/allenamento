@@ -1363,3 +1363,108 @@ img, canvas, svg { max-width: 100%; }
 }
 .tabella tbody tr:last-child td { border-bottom: none; }
 .tabella td { color: var(--testo); }
+
+/* --- Spotify --------------------------------------------------------------- */
+
+.avviso-privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  margin-bottom: var(--s-3);
+  padding: var(--s-3);
+  background: var(--sfondo-2);
+  border: 1px solid var(--bordo);
+  border-left: 3px solid var(--accento);
+  border-radius: var(--r-m);
+  font-size: 0.88rem;
+  color: var(--testo-2);
+}
+.avviso-privacy [data-lucide] { width: 18px; height: 18px; flex: 0 0 18px; margin-top: 2px; }
+
+.griglia-playlist {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: var(--s-3);
+  margin-top: var(--s-2);
+}
+.playlist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  background: var(--sfondo-2);
+  border: 1px solid var(--bordo);
+  border-radius: var(--r-m);
+}
+.playlist img {
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: var(--r-s);
+}
+.playlist .copertina-vuota {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--r-s);
+  background: var(--superficie-alta);
+  color: var(--testo-2);
+}
+.playlist .testo-playlist strong { display: block; line-height: 1.3; }
+.playlist .testo-playlist .aiuto { margin: 2px 0 0; }
+.playlist .riga-bottoni { gap: var(--s-2); }
+.playlist .area-embed:not(:empty) { margin-top: var(--s-2); }
+.playlist iframe { width: 100%; border: 0; border-radius: 12px; display: block; }
+
+.in-ascolto {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+.in-ascolto .copertina {
+  width: 56px; height: 56px;
+  flex: 0 0 56px;
+  border-radius: var(--r-s);
+  object-fit: cover;
+}
+.in-ascolto span.copertina { display: grid; place-items: center; background: var(--superficie-alta); color: var(--testo-2); }
+.in-ascolto .testo-brano { min-width: 0; flex: 1; }
+.in-ascolto .testo-brano .etichetta {
+  display: block;
+  margin: 0 0 2px;
+  font-size: 0.68rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--accento-leggibile);
+}
+.in-ascolto .testo-brano strong,
+.in-ascolto .testo-brano .aiuto {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.in-ascolto .testo-brano .aiuto { margin: 0; }
+.in-ascolto.spenta .testo-brano .etichetta { color: var(--testo-2); }
+
+/* Tre barrette che si muovono a tempo. */
+.onde { display: flex; align-items: flex-end; gap: 3px; height: 20px; flex: 0 0 auto; }
+.onde i {
+  display: block;
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accento);
+  transform-origin: bottom;
+  animation: onda 900ms ease-in-out infinite;
+}
+.onde i:nth-child(2) { animation-delay: 150ms; }
+.onde i:nth-child(3) { animation-delay: 300ms; }
+@keyframes onda {
+  0%, 100% { transform: scaleY(0.35); }
+  50%      { transform: scaleY(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .onde i { animation: none; transform: scaleY(0.6); }
+}

@@ -85,7 +85,9 @@
   }
 
   function disegna(el) {
-    let html = '<div class="card"><div class="card-testa"><h2><i data-lucide="music"></i> Scegli la musica</h2></div>';
+    let html = '<div id="area-spotify-collegamento"></div>';
+    html += '<div id="area-in-ascolto" data-in-ascolto></div>';
+    html += '<div class="card"><div class="card-testa"><h2><i data-lucide="music"></i> Scegli la musica</h2></div>';
     html += '<p class="aiuto" style="margin-top:0">Dicci come stai e cosa ti va di sentire: prepariamo la ricerca giusta.</p>';
     html += gruppoHtml('Come ti senti', dati.opzioni.mood, 'mood', scelta.mood);
     html += gruppoHtml('Stile', dati.opzioni.stili, 'stile', scelta.stile, 130);
@@ -102,6 +104,14 @@
     el.innerHTML = html;
     App.icone();
     collega(el);
+
+    // La parte Spotify si aggiunge solo se e configurata sul server.
+    if (window.Spotify) {
+      window.Spotify.montaCollegamento(document.getElementById('area-spotify-collegamento'), function () {
+        Viste.musica.mostra(el);
+      });
+      window.Spotify.montaInAscolto(document.getElementById('area-in-ascolto'));
+    }
   }
 
   async function chiediConsiglio(el, bottone) {
@@ -186,6 +196,11 @@
   Viste.musica = {
     async mostra(el, preselezione) {
       if (preselezione && preselezione.tipo) scelta.tipo = preselezione.tipo;
+      // Se si torna da Spotify, prima di tutto si dice com e andata.
+      if (window.Spotify) {
+        const esito = window.Spotify.leggiEsitoCollegamento();
+        if (esito) App.toast(esito.testo, esito.tipo, 4000);
+      }
       dati = await App.api('GET', '/api/musica');
       // Alla prima apertura si riparte dall ultima combinazione usata.
       if (dati.ultime.length && !consiglio) {

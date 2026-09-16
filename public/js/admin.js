@@ -56,7 +56,8 @@
     html += '<p class="aiuto">Creato ' + dataOra(u.created_at) + ' &middot; ultimo accesso ' + dataOra(u.last_login) + '</p>';
     html += '<p class="aiuto">' + u.allenamenti + ' allenamenti (' + u.completati + ' completati) &middot; ' +
       u.pesate + ' pesate &middot; AI oggi: ' + u.ai_oggi +
-      (u.scelte_musica ? ' &middot; ' + u.scelte_musica + ' scelte musicali' : '') + '</p>';
+      (u.scelte_musica ? ' &middot; ' + u.scelte_musica + ' scelte musicali' : '') +
+      (u.spotify_collegato ? ' &middot; Spotify collegato' : '') + '</p>';
 
     html += '<div class="riga-bottoni" style="margin-top:var(--s-3)">';
     html += '<a class="btn btn-contorno btn-piccolo" href="/api/admin/utenti/' + u.id + '/export"><i data-lucide="download"></i> Esporta</a>';
@@ -90,6 +91,56 @@
     return html;
   }
 
+  function ascoltiHtml(s) {
+    if (!s || !s.configurato) return '';
+    if (!s.collegato) {
+      return '<p class="etichetta-sezione">Spotify</p>' +
+        '<p class="aiuto">Questo utente non ha collegato il suo account.</p>';
+    }
+
+    let html = '<p class="etichetta-sezione">Spotify</p>';
+    if (s.avviso) {
+      html += '<p class="aiuto">' + App.testoSicuro(s.avviso) + '</p>';
+    } else if (s.in_ascolto) {
+      html += '<div class="card in-ascolto" id="in-ascolto-admin" style="margin:0 0 var(--s-3)">';
+      html += s.in_ascolto.copertina
+        ? '<img class="copertina" src="' + App.testoSicuro(s.in_ascolto.copertina) + '" alt="">'
+        : '<span class="copertina copertina-vuota" aria-hidden="true"><i data-lucide="disc-3"></i></span>';
+      html += '<div class="testo-brano"><span class="etichetta">' +
+        (s.in_ascolto.in_riproduzione ? 'In ascolto ora' : 'In pausa') + '</span>' +
+        '<strong>' + App.testoSicuro(s.in_ascolto.titolo) + '</strong>' +
+        '<span class="aiuto">' + App.testoSicuro(s.in_ascolto.artista) + '</span></div></div>';
+    } else {
+      html += '<p class="aiuto" id="in-ascolto-admin">Adesso non sta ascoltando niente.</p>';
+    }
+
+    if (s.artisti && s.artisti.length) {
+      html += '<p class="etichetta-sezione">Artisti piu ascoltati</p><div class="riga-chip">';
+      for (const a of s.artisti) {
+        html += '<span class="chip-musica">' + App.testoSicuro(a.artist) +
+          '<small>' + a.n + (a.n === 1 ? ' brano' : ' brani') + '</small></span>';
+      }
+      html += '</div>';
+    }
+
+    if (s.durante_allenamento && s.durante_allenamento.length) {
+      html += '<p class="etichetta-sezione">Ascoltati durante gli allenamenti</p>';
+      html += '<div class="tabella-scorrevole"><table class="tabella"><thead><tr>' +
+        '<th>Quando</th><th>Brano</th><th>Artista</th><th>Seduta</th></tr></thead><tbody>';
+      for (const b of s.durante_allenamento) {
+        html += '<tr><td>' + dataOra(b.played_at) + '</td><td>' + App.testoSicuro(b.track_name) +
+          '</td><td>' + App.testoSicuro(b.artist || '') + '</td><td>' +
+          App.testoSicuro(b.allenamento || '') + '</td></tr>';
+      }
+      html += '</tbody></table></div>';
+    } else if (s.recenti && s.recenti.length) {
+      html += '<p class="aiuto">Nessun brano registrato durante un allenamento. Ultimi ascolti: ' +
+        s.recenti.slice(0, 3).map(function (b) { return App.testoSicuro(b.track_name); }).join(', ') + '.</p>';
+    }
+
+    return html;
+  }
+
   function schedaMusicaHtml(dati) {
     const niente = !dati.ultime.length;
     let html = '<div class="card" style="margin:0">';
@@ -98,7 +149,9 @@
       '<button type="button" class="btn-contorno btn-piccolo" data-chiudi-musica>Chiudi</button></div>';
 
     if (niente) {
-      html += '<p class="aiuto">Questo utente non ha ancora scelto nessuna musica.</p></div>';
+      html += '<p class="aiuto">Questo utente non ha ancora scelto nessuna musica.</p>';
+      html += ascoltiHtml(dati.spotify);
+      html += '</div>';
       return html;
     }
 
@@ -110,6 +163,8 @@
         return App.testoSicuro(p.piattaforma) + ' ' + p.n;
       }).join(' &middot; ') + '</p>';
     }
+
+    html += ascoltiHtml(dati.spotify);
 
     html += '<p class="etichetta-sezione">Umori per settimana</p>';
     html += '<div class="grafico mini"><canvas id="grafico-mood" height="170"></canvas></div>';

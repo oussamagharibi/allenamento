@@ -457,6 +457,7 @@
         : '<div class="grafico mini"><canvas id="grafico-macro" height="190"></canvas></div>';
       html += '</div></div>';
 
+      html += '<div id="area-in-ascolto" data-in-ascolto></div>';
       html += esitiHtml(diarioOggi.valutazione);
 
       html += '<div class="card"><div class="card-testa"><h2><i data-lucide="sparkles"></i> Coach AI</h2></div>' +
@@ -467,6 +468,7 @@
 
       el.innerHTML = html;
       App.icone();
+      if (window.Spotify) window.Spotify.montaInAscolto(document.getElementById('area-in-ascolto'));
 
       const cerchio = document.getElementById('anello-valore');
       if (cerchio && avanzamento) {
