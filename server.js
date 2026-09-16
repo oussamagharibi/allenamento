@@ -107,6 +107,7 @@ app.use('/api/allenamenti', require('./routes/allenamenti'));
 app.use('/api/esercizi', require('./routes/esercizi'));
 app.use('/api/alimentazione', require('./routes/alimentazione'));
 app.use('/api/diario', require('./routes/diario'));
+app.use('/api/musica', require('./routes/musica'));
 app.use('/api/progressi', require('./routes/progressi'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/admin', require('./routes/admin'));

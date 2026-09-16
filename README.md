@@ -80,6 +80,32 @@ pasti di una giornata (`POST /api/ai/alimentazione`), rispettando preferenze e
 allergie e senza mai scendere sotto il metabolismo basale.
 `node scripts/verifica-alimentazione.js` controlla calcoli e filtri.
 
+## Musica
+
+Consigli di ascolto per la seduta, sempre disponibili e senza chiamate a
+servizi esterni. Si sceglie l'umore (triste, stanco, stressato, arrabbiato,
+normale, carico), lo stile (rap, trap, pop, rock, metal, EDM/techno, reggaeton,
+afrobeat, musica araba, rap francese, hip hop anni 90) e il paese (Italia, USA,
+UK, Francia, Spagna, Marocco, internazionale). Il tipo di allenamento (forza,
+cardio, stretching) e facoltativo. Si arriva qui dal menu oppure dal pulsante
+"Scegli la musica" nella schermata di inizio allenamento, che preseleziona il
+tipo guardando il titolo della seduta.
+
+`lib/musica.js` traduce la scelta in una ricerca: lo stile apre la stringa, il
+paese si aggiunge solo se non e gia implicito nello stile (niente "rap francese
+francese"), poi arrivano le parole dell'umore e infine "workout" - per esempio
+`rap italiano motivational workout`. Ogni umore porta con se anche un andamento
+dell'energia e una frase motivazionale scritta per l'app: testi originali, mai
+versi di canzoni. Sullo stretching le parole che alzano il ritmo spariscono.
+
+Da li partono due link, "Apri su Spotify" (ricerca su open.spotify.com) e
+"Apri su YouTube": ogni clic finisce in `music_events` con la ricerca ricostruita
+dal server, mentre le combinazioni scelte e quelle segnate con la stella stanno
+in `music_prefs`. Nel pannello admin ogni utente ha una scheda "Musica" con gli
+umori e gli stili piu frequenti, le ultime 20 scelte e un grafico degli umori
+settimana per settimana.
+`node scripts/verifica-musica.js` controlla ricerche, energia, frasi e validazione.
+
 ## Diario alimentare
 
 Acqua e pasti della giornata, nella dashboard e nella pagina Alimentazione.
@@ -150,9 +176,9 @@ finisce in `admin_log`. Se `ADMIN_PASSWORD` non e impostata, `/admin` risponde 4
 ```
 server.js           avvio, sessioni, rotte, migrazione
 db/                 pool PostgreSQL e migrazione
-lib/                calcoli, catalogo esercizi, generatore schede, nutrizione, diario
+lib/                calcoli, catalogo esercizi, generatore schede, nutrizione, diario, musica
 middleware/auth.js  protezione sito + utente
-routes/             auth, profilo, allenamenti, progressi, alimentazione, diario, AI
+routes/             auth, profilo, allenamenti, progressi, alimentazione, diario, musica, AI
 public/             frontend (HTML/CSS/JS vanilla)
 ```
 

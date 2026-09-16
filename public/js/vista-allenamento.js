@@ -167,6 +167,14 @@
     return html;
   }
 
+  // Lo stesso criterio di lib/musica.js, qui per preselezionare il tipo.
+  function tipoMusica(a) {
+    const titolo = String((a && a.titolo) || '').toLowerCase();
+    if (titolo.indexOf('cardio') !== -1 || titolo.indexOf('resistenza') !== -1) return 'cardio';
+    if (titolo.indexOf('mobilita') !== -1 || titolo.indexOf('stretching') !== -1) return 'stretching';
+    return 'forza';
+  }
+
   function anteprimaSeduta(a, oggi) {
     const principali = a.esercizi.filter(function (e) { return e.fase === 'principale'; });
     let html = '<div class="card">';
@@ -176,8 +184,11 @@
     html += '<p class="aiuto">' + App.dataIta(a.data) + ' &middot; ' + principali.length + ' esercizi principali' +
       (a.origine === 'ai' ? ' &middot; dal Coach AI' : '') + '</p>';
 
-    html += '<button type="button" class="btn-principale btn-blocco btn-grande" style="margin:var(--s-4) 0" id="inizia">' +
+    html += '<button type="button" class="btn-principale btn-blocco btn-grande" style="margin:var(--s-4) 0 var(--s-2)" id="inizia">' +
       '<i data-lucide="play"></i> ' + (a.completato ? 'Rivedi la seduta' : 'Inizia') + '</button>';
+    html += '<button type="button" class="btn-contorno btn-blocco" style="margin-bottom:var(--s-4)" id="scegli-musica" ' +
+      'data-tipo-musica="' + App.testoSicuro(tipoMusica(a)) + '">' +
+      '<i data-lucide="music"></i> Scegli la musica</button>';
 
     // Elenco completo: ogni riga apre la spiegazione dell esercizio.
     for (const fase of ['riscaldamento', 'principale', 'stretching']) {
@@ -393,6 +404,16 @@
       el.querySelectorAll('[data-apri]').forEach(function (b) {
         b.addEventListener('click', function () { Viste.allenamento.mostra(el, b.dataset.apri); });
       });
+
+      const musica = document.getElementById('scegli-musica');
+      if (musica) {
+        musica.addEventListener('click', function () {
+          if (Viste.musica && typeof Viste.musica.preparaPer === 'function') {
+            Viste.musica.preparaPer(musica.dataset.tipoMusica);
+          }
+          App.vaiA('musica');
+        });
+      }
 
       const inizia = document.getElementById('inizia');
       if (inizia) {

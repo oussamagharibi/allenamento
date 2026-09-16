@@ -133,6 +133,33 @@ const SQL = [
    )`,
 
   `CREATE INDEX IF NOT EXISTS admin_log_data_idx ON admin_log (created_at DESC)`,
+
+  // --- Musica: scelte di ascolto e clic sui link ------------------------------
+
+  `CREATE TABLE IF NOT EXISTS music_prefs (
+     id         SERIAL PRIMARY KEY,
+     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     mood       TEXT NOT NULL,
+     stile      TEXT NOT NULL,
+     paese      TEXT NOT NULL,
+     preferita  BOOLEAN NOT NULL DEFAULT false,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   )`,
+
+  `CREATE INDEX IF NOT EXISTS music_prefs_utente_idx ON music_prefs (user_id, created_at DESC)`,
+
+  `CREATE TABLE IF NOT EXISTS music_events (
+     id          SERIAL PRIMARY KEY,
+     user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     mood        TEXT,
+     stile       TEXT,
+     paese       TEXT,
+     query       TEXT NOT NULL,
+     piattaforma TEXT NOT NULL,
+     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+   )`,
+
+  `CREATE INDEX IF NOT EXISTS music_events_utente_idx ON music_events (user_id, created_at DESC)`,
 ];
 
 async function migra() {

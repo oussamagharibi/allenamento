@@ -1256,3 +1256,110 @@ img, canvas, svg { max-width: 100%; }
   border: 1px solid var(--bordo);
   margin: 0 auto var(--s-3);
 }
+
+/* --- Musica ---------------------------------------------------------------- */
+
+.bandiera {
+  font-size: 1.35rem;
+  line-height: 1;
+  width: 32px;
+  flex: 0 0 32px;
+  text-align: center;
+}
+
+.frase-musica {
+  margin: var(--s-2) 0 var(--s-3);
+  font-size: 1.02rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--testo);
+}
+
+.ricerca-musica {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+  padding: var(--s-2) var(--s-3);
+  margin-bottom: var(--s-3);
+  background: var(--sfondo-2);
+  border: 1px solid var(--bordo);
+  border-radius: var(--r-m);
+}
+.ricerca-musica .etichetta {
+  margin: 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--testo-2);
+}
+.ricerca-musica code {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.9rem;
+  color: var(--testo);
+  overflow-wrap: anywhere;
+}
+
+.btn-spotify { background: #1db954; border-color: #1db954; color: #07210f; }
+.btn-spotify:hover { background: #1ed760; border-color: #1ed760; }
+
+.riga-chip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.chip-musica {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px var(--s-3);
+  background: var(--sfondo-2);
+  border: 1px solid var(--bordo);
+  border-radius: var(--r-pill);
+  color: var(--testo);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color var(--transizione), background var(--transizione);
+}
+.chip-musica:hover { border-color: var(--accento); background: var(--accento-tenue); }
+.chip-musica small { color: var(--testo-2); font-size: 0.72rem; font-weight: 400; }
+
+/* Con sette voci la barra in basso ha bisogno di un po piu di respiro. */
+.barra-basso a { min-width: 0; }
+.barra-basso a span,
+.barra-basso a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 400px) {
+  .barra-basso a { font-size: 0.62rem; padding: 7px 1px; }
+  .barra-basso a [data-lucide] { width: 19px; height: 19px; }
+}
+
+/* Tabellina compatta: su schermo stretto scorre da sola, senza allargare la pagina. */
+.tabella-scorrevole {
+  overflow-x: auto;
+  margin-top: var(--s-2);
+  border: 1px solid var(--bordo);
+  border-radius: var(--r-m);
+}
+.tabella {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.tabella th,
+.tabella td {
+  padding: 8px var(--s-3);
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--bordo);
+}
+.tabella th {
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--testo-2);
+  font-weight: 600;
+}
+.tabella tbody tr:last-child td { border-bottom: none; }
+.tabella td { color: var(--testo); }

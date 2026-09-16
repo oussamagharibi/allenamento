@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 
 const db = require('../db');
 const C = require('../lib/costanti');
+const musica = require('../lib/musica');
 const { requireAdmin, adminAbilitato, adminValido, rinnovaAdmin, scollegaAdmin, DURATA_ADMIN } = require('../middleware/auth');
 
 const router = express.Router();
@@ -121,6 +122,7 @@ router.get('/utenti', async (req, res, next) => {
               (SELECT COUNT(*) FROM weight_logs l WHERE l.user_id = u.id)::int AS pesate,
               (SELECT COUNT(*) FROM meal_logs m WHERE m.user_id = u.id)::int AS pasti_registrati,
               (SELECT COUNT(*) FROM water_logs a WHERE a.user_id = u.id)::int AS registrazioni_acqua,
+              (SELECT COUNT(*) FROM music_prefs m WHERE m.user_id = u.id)::int AS scelte_musica,
               COALESCE((SELECT a.conteggio FROM ai_usage a
                          WHERE a.user_id = u.id AND a.data = CURRENT_DATE), 0)::int AS ai_oggi,
               EXISTS(SELECT 1 FROM profiles p WHERE p.user_id = u.id) AS profilo
@@ -142,6 +144,78 @@ router.get('/utenti', async (req, res, next) => {
       totale: utenti.length,
       massimo: C.MAX_UTENTI,
       limite_ai: C.LIMITE_AI_GIORNALIERO,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Ascolti di un utente: umori e stili piu frequenti, ultime scelte e
+// andamento degli umori settimana per settimana.
+router.get('/utenti/:id/musica', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ errore: 'Utente non valido.' });
+    const utente = await db.uno('SELECT id, name FROM users WHERE id = $1', [id]);
+    if (!utente) return res.status(404).json({ errore: 'Utente non trovato.' });
+
+    const conta = function (colonna) {
+      return db.tutte(
+        'SELECT ' + colonna + ' AS valore, COUNT(*)::int AS n FROM music_prefs' +
+        ' WHERE user_id = $1 GROUP BY 1 ORDER BY n DESC, valore ASC LIMIT 6',
+        [id]
+      );
+    };
+
+    const [mood, stili, paesi, ultime, eventi, settimane] = await Promise.all([
+      conta('mood'),
+      conta('stile'),
+      conta('paese'),
+      db.tutte(
+        `SELECT id, mood, stile, paese, preferita, created_at FROM music_prefs
+          WHERE user_id = $1 ORDER BY created_at DESC, id DESC LIMIT 20`,
+        [id]
+      ),
+      db.tutte(
+        `SELECT piattaforma, COUNT(*)::int AS n FROM music_events
+          WHERE user_id = $1 GROUP BY 1 ORDER BY n DESC`,
+        [id]
+      ),
+      db.tutte(
+        `SELECT to_char(date_trunc('week', created_at), 'YYYY-MM-DD') AS settimana,
+                mood, COUNT(*)::int AS n
+           FROM music_prefs
+          WHERE user_id = $1 AND created_at >= now() - interval '8 weeks'
+          GROUP BY 1, 2 ORDER BY 1 ASC`,
+        [id]
+      ),
+    ]);
+
+    const conEtichetta = function (righe, gruppo) {
+      return righe.map(function (r) {
+        return { valore: r.valore, etichetta: musica.etichetta(gruppo, r.valore), n: r.n };
+      });
+    };
+
+    res.json({
+      utente: { id: utente.id, nome: utente.name },
+      mood: conEtichetta(mood, 'mood'),
+      stili: conEtichetta(stili, 'stile'),
+      paesi: conEtichetta(paesi, 'paese'),
+      piattaforme: eventi,
+      ultime: ultime.map(function (r) {
+        return Object.assign({}, r, {
+          etichette: {
+            mood: musica.etichetta('mood', r.mood),
+            stile: musica.etichetta('stile', r.stile),
+            paese: musica.etichetta('paese', r.paese),
+          },
+        });
+      }),
+      settimane,
+      mood_possibili: musica.MOOD_VALIDI.map(function (m) {
+        return { valore: m, etichetta: musica.etichetta('mood', m) };
+      }),
     });
   } catch (err) {
     next(err);
@@ -198,6 +272,14 @@ async function raccogliDati(esecutore, userId) {
        FROM meal_logs WHERE user_id = $1 ORDER BY data ASC, id ASC`,
     [userId]
   )).rows;
+  const sceltaMusica = (await esecutore.query(
+    'SELECT id, user_id, mood, stile, paese, preferita, created_at FROM music_prefs WHERE user_id = $1 ORDER BY created_at ASC, id ASC',
+    [userId]
+  )).rows;
+  const eventiMusica = (await esecutore.query(
+    'SELECT id, user_id, mood, stile, paese, query, piattaforma, created_at FROM music_events WHERE user_id = $1 ORDER BY created_at ASC, id ASC',
+    [userId]
+  )).rows;
   return {
     versione: 1,
     esportato_il: new Date().toISOString(),
@@ -209,6 +291,8 @@ async function raccogliDati(esecutore, userId) {
     ai_usage: usoAi,
     water_logs: acqua,
     meal_logs: pasti,
+    music_prefs: sceltaMusica,
+    music_events: eventiMusica,
   };
 }
 
@@ -248,6 +332,8 @@ async function salvaBackup(client, userId) {
 }
 
 async function cancellaDati(client, userId) {
+  await client.query('DELETE FROM music_events WHERE user_id = $1', [userId]);
+  await client.query('DELETE FROM music_prefs WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM water_logs WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM meal_logs WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM ai_usage WHERE user_id = $1', [userId]);
@@ -553,6 +639,28 @@ router.post('/backup/:id/ripristina', async (req, res, next) => {
       );
     }
 
+    for (const riga of Array.isArray(dati.music_prefs) ? dati.music_prefs : []) {
+      await client.query(
+        `INSERT INTO music_prefs (user_id, mood, stile, paese, preferita, created_at)
+              VALUES ($1, $2, $3, $4, $5, COALESCE($6::timestamptz, now()))`,
+        [
+          utente.id, riga.mood || 'normale', riga.stile || 'rap', riga.paese || 'italia',
+          Boolean(riga.preferita), riga.created_at || null,
+        ]
+      );
+    }
+
+    for (const riga of Array.isArray(dati.music_events) ? dati.music_events : []) {
+      await client.query(
+        `INSERT INTO music_events (user_id, mood, stile, paese, query, piattaforma, created_at)
+              VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::timestamptz, now()))`,
+        [
+          utente.id, riga.mood || null, riga.stile || null, riga.paese || null,
+          riga.query || '', riga.piattaforma || 'spotify', riga.created_at || null,
+        ]
+      );
+    }
+
     await registraLog(client, 'ripristina backup', nome + ' (backup ' + backup.id + ')');
     await client.query('COMMIT');
     res.json({
@@ -566,6 +674,7 @@ router.post('/backup/:id/ripristina', async (req, res, next) => {
         report: (dati.ai_reports || []).length,
         acqua: (dati.water_logs || []).length,
         pasti: (dati.meal_logs || []).length,
+        scelte_musica: (dati.music_prefs || []).length,
       },
     });
   } catch (err) {

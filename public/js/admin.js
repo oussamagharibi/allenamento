@@ -55,20 +55,143 @@
 
     html += '<p class="aiuto">Creato ' + dataOra(u.created_at) + ' &middot; ultimo accesso ' + dataOra(u.last_login) + '</p>';
     html += '<p class="aiuto">' + u.allenamenti + ' allenamenti (' + u.completati + ' completati) &middot; ' +
-      u.pesate + ' pesate &middot; AI oggi: ' + u.ai_oggi + '</p>';
+      u.pesate + ' pesate &middot; AI oggi: ' + u.ai_oggi +
+      (u.scelte_musica ? ' &middot; ' + u.scelte_musica + ' scelte musicali' : '') + '</p>';
 
     html += '<div class="riga-bottoni" style="margin-top:var(--s-3)">';
     html += '<a class="btn btn-contorno btn-piccolo" href="/api/admin/utenti/' + u.id + '/export"><i data-lucide="download"></i> Esporta</a>';
     html += '<button type="button" class="btn-contorno btn-piccolo" data-azione="rinomina"><i data-lucide="pencil"></i> Rinomina</button>';
     html += '<button type="button" class="btn-contorno btn-piccolo" data-azione="azzera-ai"><i data-lucide="sparkles"></i> Azzera AI</button>';
+    html += '<button type="button" class="btn-contorno btn-piccolo" data-azione="musica"><i data-lucide="music"></i> Musica</button>';
     html += '<button type="button" class="btn-contorno btn-piccolo" data-azione="sessioni"><i data-lucide="log-out"></i> Sessioni</button>';
     html += '<button type="button" class="btn-contorno btn-piccolo" data-azione="reset-password"><i data-lucide="key-round"></i> Reset password</button>';
     html += '<button type="button" class="btn-pericolo btn-piccolo" data-azione="reset"><i data-lucide="eraser"></i> Azzera dati</button>';
     html += '<button type="button" class="btn-pericolo btn-piccolo" data-azione="elimina"><i data-lucide="trash-2"></i> Elimina</button>';
     html += '</div>';
     html += '<div class="nascosto" data-conferma style="margin-top:var(--s-3)"></div>';
+    html += '<div class="nascosto" data-musica style="margin-top:var(--s-3)"></div>';
     html += '</div>';
     return html;
+  }
+
+  const COLORI_MOOD = {
+    triste: '#6f8fd6', stanco: '#8a7fd1', stressato: '#d6a355',
+    arrabbiato: '#e05a4d', normale: '#7f8b9c', carico: '#4fbf6b',
+  };
+
+  function elencoConteggi(titolo, righe) {
+    if (!righe || !righe.length) return '';
+    let html = '<p class="etichetta-sezione">' + titolo + '</p><div class="riga-chip">';
+    for (const r of righe) {
+      html += '<span class="chip-musica">' + App.testoSicuro(r.etichetta) + '<small>' + r.n +
+        (r.n === 1 ? ' volta' : ' volte') + '</small></span>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function schedaMusicaHtml(dati) {
+    const niente = !dati.ultime.length;
+    let html = '<div class="card" style="margin:0">';
+    html += '<div class="card-testa"><h3><i data-lucide="music"></i> Musica di ' +
+      App.testoSicuro(dati.utente.nome) + '</h3>' +
+      '<button type="button" class="btn-contorno btn-piccolo" data-chiudi-musica>Chiudi</button></div>';
+
+    if (niente) {
+      html += '<p class="aiuto">Questo utente non ha ancora scelto nessuna musica.</p></div>';
+      return html;
+    }
+
+    html += elencoConteggi('Umori piu frequenti', dati.mood);
+    html += elencoConteggi('Stili', dati.stili);
+    html += elencoConteggi('Paesi', dati.paesi);
+    if (dati.piattaforme && dati.piattaforme.length) {
+      html += '<p class="aiuto">Link aperti: ' + dati.piattaforme.map(function (p) {
+        return App.testoSicuro(p.piattaforma) + ' ' + p.n;
+      }).join(' &middot; ') + '</p>';
+    }
+
+    html += '<p class="etichetta-sezione">Umori per settimana</p>';
+    html += '<div class="grafico mini"><canvas id="grafico-mood" height="170"></canvas></div>';
+
+    html += '<p class="etichetta-sezione">Ultime ' + dati.ultime.length + ' scelte</p>';
+    html += '<div class="tabella-scorrevole"><table class="tabella"><thead><tr>' +
+      '<th>Quando</th><th>Umore</th><th>Stile</th><th>Paese</th><th></th></tr></thead><tbody>';
+    for (const s of dati.ultime) {
+      html += '<tr><td>' + dataOra(s.created_at) + '</td><td>' + App.testoSicuro(s.etichette.mood) +
+        '</td><td>' + App.testoSicuro(s.etichette.stile) + '</td><td>' + App.testoSicuro(s.etichette.paese) +
+        '</td><td>' + (s.preferita ? '<span class="tag verde">preferita</span>' : '') + '</td></tr>';
+    }
+    html += '</tbody></table></div></div>';
+    return html;
+  }
+
+  // Una barra per umore, impilata settimana per settimana.
+  function disegnaGraficoMood(dati) {
+    const tela = document.getElementById('grafico-mood');
+    if (!tela || typeof Chart === 'undefined') return;
+    const settimane = [];
+    for (const r of dati.settimane) if (settimane.indexOf(r.settimana) === -1) settimane.push(r.settimana);
+    if (!settimane.length) {
+      tela.closest('.grafico').innerHTML = '<p class="aiuto">Ancora troppo poche scelte per un grafico.</p>';
+      return;
+    }
+
+    const stile = getComputedStyle(document.documentElement);
+    const testo = stile.getPropertyValue('--testo-2').trim() || '#98a4b3';
+    const griglia = stile.getPropertyValue('--bordo').trim() || '#2a3038';
+
+    const serie = dati.mood_possibili.map(function (m) {
+      return {
+        label: m.etichetta,
+        backgroundColor: COLORI_MOOD[m.valore] || '#7f8b9c',
+        borderRadius: 4,
+        data: settimane.map(function (s) {
+          const trovata = dati.settimane.filter(function (r) { return r.settimana === s && r.mood === m.valore; })[0];
+          return trovata ? trovata.n : 0;
+        }),
+      };
+    }).filter(function (s) { return s.data.some(function (n) { return n > 0; }); });
+
+    new Chart(tela, {
+      type: 'bar',
+      data: {
+        labels: settimane.map(function (s) { return s.slice(8) + '/' + s.slice(5, 7); }),
+        datasets: serie,
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: testo, boxWidth: 12 } } },
+        scales: {
+          x: { stacked: true, ticks: { color: testo }, grid: { display: false } },
+          y: {
+            stacked: true, beginAtZero: true,
+            ticks: { color: testo, precision: 0 },
+            grid: { color: griglia },
+            title: { display: true, text: 'scelte', color: testo },
+          },
+        },
+      },
+    });
+  }
+
+  async function apriMusica(blocco, utente) {
+    const area = blocco.querySelector('[data-musica]');
+    area.classList.remove('nascosto');
+    area.innerHTML = App.scheletro(2);
+    try {
+      const dati = await api('GET', '/api/admin/utenti/' + utente.id + '/musica');
+      area.innerHTML = schedaMusicaHtml(dati);
+      App.icone();
+      disegnaGraficoMood(dati);
+      area.querySelector('[data-chiudi-musica]').addEventListener('click', function () {
+        area.classList.add('nascosto');
+        area.innerHTML = '';
+      });
+    } catch (err) {
+      area.innerHTML = '<div class="messaggio errore">' + App.testoSicuro(err.message) + '</div>';
+    }
   }
 
   function disegnaUtenti(dati) {
@@ -224,6 +347,8 @@
       }
       return;
     }
+
+    if (azione === 'musica') { apriMusica(blocco, utente); return; }
 
     if (azione === 'sessioni') {
       App.occupato(bottone, true, '...');
