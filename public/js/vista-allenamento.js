@@ -116,6 +116,23 @@
     return Number(e.serie) > 1 ? e.serie + ' x ' + quantita : quantita;
   }
 
+  // Quantita mostrata nel badge: "3 x 12 rip" oppure "40 sec".
+  function badgeQuantita(e) {
+    const quantita = App.numero(e.ripetizioni, 0) + (e.misura === 'secondi' ? ' sec' : ' rip');
+    return Number(e.serie) > 1 ? e.serie + ' &times; ' + quantita : quantita;
+  }
+
+  // Riga dell elenco: tutto il rigo apre la scheda con la spiegazione.
+  function rigaEsercizio(e) {
+    return '<button type="button" class="riga-esercizio" data-scheda="' + App.testoSicuro(e.id) + '" ' +
+      'aria-label="Come si fa: ' + App.testoSicuro(e.nome) + '">' +
+      '<i data-lucide="' + ICONE_FASI[e.fase] + '" class="fase-es" aria-hidden="true"></i>' +
+      '<span class="nome-es">' + App.testoSicuro(e.nome) + '</span>' +
+      '<span class="badge-serie">' + badgeQuantita(e) + '</span>' +
+      '<i data-lucide="info" class="icona-info" aria-hidden="true"></i>' +
+      '</button>';
+  }
+
   function serieFatte(e) {
     return (Array.isArray(e.log) ? e.log : []).filter(function (s) { return Number(s.ripetizioni) > 0; }).length;
   }
@@ -152,22 +169,24 @@
 
   function anteprimaSeduta(a, oggi) {
     const principali = a.esercizi.filter(function (e) { return e.fase === 'principale'; });
-    let html = '<div class="card card-accento">';
+    let html = '<div class="card">';
     html += '<span class="tag ' + (a.completato ? 'verde' : 'acceso') + '">' +
       (a.completato ? 'Completato' : (oggi ? 'Oggi' : App.giornoSettimana(a.data))) + '</span>';
     html += '<h2 style="margin-top:var(--s-2)">' + App.testoSicuro(a.titolo || 'Seduta') + '</h2>';
     html += '<p class="aiuto">' + App.dataIta(a.data) + ' &middot; ' + principali.length + ' esercizi principali' +
       (a.origine === 'ai' ? ' &middot; dal Coach AI' : '') + '</p>';
 
-    html += '<ul class="lista-secca">';
-    for (const e of principali.slice(0, 5)) {
-      html += '<li>' + App.testoSicuro(e.nome) + ' - ' + App.testoSicuro(prescrizione(e)) + '</li>';
-    }
-    if (principali.length > 5) html += '<li>e altri ' + (principali.length - 5) + '...</li>';
-    html += '</ul>';
-
-    html += '<button type="button" class="btn-principale btn-blocco btn-grande" style="margin-top:var(--s-4)" id="inizia">' +
+    html += '<button type="button" class="btn-principale btn-blocco btn-grande" style="margin:var(--s-4) 0" id="inizia">' +
       '<i data-lucide="play"></i> ' + (a.completato ? 'Rivedi la seduta' : 'Inizia') + '</button>';
+
+    // Elenco completo: ogni riga apre la spiegazione dell esercizio.
+    for (const fase of ['riscaldamento', 'principale', 'stretching']) {
+      const gruppo = a.esercizi.filter(function (e) { return e.fase === fase; });
+      if (!gruppo.length) continue;
+      html += '<p class="etichetta-sezione">' + NOMI_FASI[fase] + '</p>';
+      for (const e of gruppo) html += rigaEsercizio(e);
+    }
+    html += '<p class="aiuto">Tocca un esercizio per vedere come si fa.</p>';
     html += '</div>';
     return html;
   }
@@ -180,6 +199,10 @@
     html += '<span class="tag"><i data-lucide="' + ICONE_FASI[e.fase] + '"></i> ' + NOMI_FASI[e.fase] + '</span>';
     html += '<div class="nome-esercizio">' + App.testoSicuro(e.nome) + '</div>';
     html += '<div class="dettaglio">' + App.testoSicuro(prescrizione(e)) + '</div>';
+    // Apre la spiegazione senza toccare il timer, che continua a scorrere.
+    html += '<div class="riga-bottoni" style="justify-content:center; margin-top:var(--s-3)">' +
+      '<button type="button" class="btn-contorno btn-piccolo" data-scheda="' + App.testoSicuro(e.id) + '">' +
+      '<i data-lucide="book-open"></i> Come si fa</button></div>';
     if (Number(e.carico) > 0) {
       html += '<p class="aiuto">Carico suggerito: ' + App.numero(e.carico, 1) + ' kg</p>';
     }
@@ -248,6 +271,7 @@
 
     contenitore.innerHTML = html;
     App.icone();
+    App.collegaSchede(contenitore);
   }
 
   // --- Azioni -----------------------------------------------------------------
@@ -349,6 +373,7 @@
       html += settimanaHtml(settimana.allenamenti || []);
       el.innerHTML = html;
       App.icone();
+      App.collegaSchede(el);
 
       const genera = document.getElementById('genera-scheda') || document.getElementById('genera-scheda-vuoto');
       if (genera) {

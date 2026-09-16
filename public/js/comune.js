@@ -259,10 +259,150 @@
   }
   registraServiceWorker();
 
+
+  // --- Scheda esercizio (foglio dal basso su telefono, finestra su schermo grande) ---
+
+  // Le schede sono testi fissi: una volta scaricate restano in memoria.
+  const schedeInMemoria = {};
+  let schedaAperta = null;
+  let focusPrecedente = null;
+
+  async function caricaScheda(id) {
+    if (schedeInMemoria[id]) return schedeInMemoria[id];
+    const dati = await api('GET', '/api/esercizi/' + encodeURIComponent(id));
+    schedeInMemoria[id] = dati.esercizio;
+    return dati.esercizio;
+  }
+
+  function elencoHtml(voci, ordinato) {
+    const tag = ordinato ? 'ol' : 'ul';
+    return '<' + tag + ' class="elenco-scheda">' +
+      (voci || []).map(function (v) { return '<li>' + testoSicuro(v) + '</li>'; }).join('') +
+      '</' + tag + '>';
+  }
+
+  function sezione(titolo, icona, contenuto) {
+    if (!contenuto) return '';
+    return '<section class="blocco-scheda"><h3><i data-lucide="' + icona + '"></i> ' +
+      testoSicuro(titolo) + '</h3>' + contenuto + '</section>';
+  }
+
+  function schedaHtml(e) {
+    let html = '<div class="foglio-testa">';
+    html += '<div class="foglio-titolo"><h2 id="titolo-scheda">' + testoSicuro(e.nome) + '</h2>' +
+      '<div class="foglio-tag"><span class="tag">' + testoSicuro(e.gruppo) + '</span>' +
+      '<span class="tag">' + testoSicuro(e.livello) + '</span>' +
+      (e.attrezzatura && e.attrezzatura.length
+        ? '<span class="tag">' + testoSicuro(e.attrezzatura.join(', ')) + '</span>'
+        : '<span class="tag">corpo libero</span>') + '</div></div>';
+    html += '<button type="button" class="btn-contorno btn-icona" data-chiudi-scheda aria-label="Chiudi la scheda">' +
+      '<i data-lucide="x"></i></button></div>';
+
+    html += '<div class="foglio-corpo">';
+    html += '<p class="scheda-descrizione">' + testoSicuro(e.descrizione) + '</p>';
+
+    const m = e.muscoli || {};
+    let muscoli = '<p class="aiuto" style="margin-top:0"><strong>Principali:</strong> ' +
+      testoSicuro((m.principali || []).join(', ')) + '</p>';
+    if (m.secondari && m.secondari.length) {
+      muscoli += '<p class="aiuto"><strong>Secondari:</strong> ' + testoSicuro(m.secondari.join(', ')) + '</p>';
+    }
+    html += sezione('Muscoli coinvolti', 'target', muscoli);
+    html += sezione('Posizione iniziale', 'move-3d', '<p>' + testoSicuro(e.posizione_iniziale) + '</p>');
+    html += sezione('Come si esegue', 'list-ordered', elencoHtml(e.esecuzione, true));
+    html += sezione('Respirazione', 'wind', '<p>' + testoSicuro(e.respirazione) + '</p>');
+    html += sezione('Errori da evitare', 'circle-alert', elencoHtml(e.errori_comuni, false));
+    html += sezione('Consigli', 'lightbulb', elencoHtml(e.consigli, false));
+    html += sezione('Varianti', 'shuffle',
+      '<div class="varianti">' +
+      '<div class="variante"><span class="etichetta-sezione">Piu facile</span>' + testoSicuro(e.versione_facile) + '</div>' +
+      '<div class="variante"><span class="etichetta-sezione">Piu difficile</span>' + testoSicuro(e.versione_difficile) + '</div>' +
+      '</div>');
+    if (e.attenzione) {
+      html += '<div class="messaggio avviso"><strong>Attenzione:</strong> ' + testoSicuro(e.attenzione) + '</div>';
+    }
+    html += '<a class="btn btn-contorno btn-blocco" href="' + testoSicuro(e.link_video) +
+      '" target="_blank" rel="noopener noreferrer"><i data-lucide="play-circle"></i> Cerca un video su YouTube</a>';
+    html += '<p class="aiuto">I video non sono nostri: si apre una ricerca con il nome dell esercizio.</p>';
+    html += '</div>';
+    return html;
+  }
+
+  function chiudiScheda() {
+    if (!schedaAperta) return;
+    document.removeEventListener('keydown', tastoScheda);
+    schedaAperta.classList.add('in-uscita');
+    const velo = schedaAperta;
+    schedaAperta = null;
+    setTimeout(function () { velo.remove(); }, 180);
+    if (focusPrecedente && document.contains(focusPrecedente)) focusPrecedente.focus();
+    focusPrecedente = null;
+  }
+
+  function tastoScheda(evento) {
+    if (evento.key === 'Escape') {
+      evento.preventDefault();
+      chiudiScheda();
+    }
+  }
+
+  // Apre la scheda di un esercizio. Non tocca timer o altre parti della pagina.
+  async function apriScheda(id) {
+    if (!id) return;
+    chiudiScheda();
+    focusPrecedente = document.activeElement;
+
+    const velo = document.createElement('div');
+    velo.className = 'velo-scheda';
+    velo.innerHTML = '<div class="foglio" role="dialog" aria-modal="true" aria-labelledby="titolo-scheda">' +
+      '<div class="foglio-corpo"><div class="skeleton corto"></div>' +
+      '<div class="skeleton medio"></div><div class="skeleton medio"></div></div></div>';
+    document.body.appendChild(velo);
+    schedaAperta = velo;
+    document.addEventListener('keydown', tastoScheda);
+
+    // Tocco fuori dal foglio: si chiude.
+    velo.addEventListener('click', function (evento) {
+      if (evento.target === velo) chiudiScheda();
+      if (evento.target.closest && evento.target.closest('[data-chiudi-scheda]')) chiudiScheda();
+    });
+
+    try {
+      const esercizio = await caricaScheda(id);
+      if (schedaAperta !== velo) return;
+      velo.querySelector('.foglio').innerHTML = schedaHtml(esercizio);
+      icone();
+      const chiudi = velo.querySelector('[data-chiudi-scheda]');
+      if (chiudi) chiudi.focus();
+    } catch (err) {
+      if (schedaAperta !== velo) return;
+      velo.querySelector('.foglio').innerHTML =
+        '<div class="foglio-testa"><h2 id="titolo-scheda">Scheda non disponibile</h2>' +
+        '<button type="button" class="btn-contorno btn-icona" data-chiudi-scheda aria-label="Chiudi">' +
+        '<i data-lucide="x"></i></button></div>' +
+        '<div class="foglio-corpo"><div class="messaggio errore">' + testoSicuro(err.message) + '</div></div>';
+      icone();
+    }
+  }
+
+  // Collega tutti i pulsanti con data-scheda presenti dentro un contenitore.
+  function collegaSchede(contenitore) {
+    const radice = contenitore || document;
+    radice.querySelectorAll('[data-scheda]').forEach(function (b) {
+      if (b.dataset.schedaCollegata) return;
+      b.dataset.schedaCollegata = '1';
+      b.addEventListener('click', function (evento) {
+        evento.preventDefault();
+        apriScheda(b.dataset.scheda);
+      });
+    });
+  }
+
   window.App = {
     api, mostra, pulisci, occupato, toast,
     tema, impostaTema, alternaTema, collegaTema,
     icone, scheletro, iniziale, coloreAvatar, avatarHtml,
     testoSicuro, dataIta, giornoSettimana, oggiISO, numero, vibra, animazioniRidotte,
+    apriScheda, chiudiScheda, collegaSchede,
   };
 })();

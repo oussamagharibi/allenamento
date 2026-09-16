@@ -63,6 +63,18 @@ e sessione rigenerata dopo ogni accesso riuscito. Dal profilo si cambia la passw
 (serve quella attuale) e le altre sessioni aperte vengono chiuse; dal pannello admin
 si puo azzerare la password di un utente, che ne imposta una nuova al rientro.
 
+## Schede degli esercizi
+
+Ogni esercizio del catalogo (81 in tutto, compresi riscaldamento e stretching) ha
+una spiegazione scritta a mano in `lib/esercizi.js`: descrizione, muscoli coinvolti,
+posizione iniziale, passi dell'esecuzione, respirazione, errori da evitare, consigli,
+versione piu facile e piu difficile, nota per chi ha infortuni e un link a una
+ricerca YouTube con il nome dell'esercizio. Sono testi fissi: nessuna chiamata AI.
+
+Si aprono toccando un esercizio nell'elenco della scheda, o dal pulsante
+"Come si fa" durante la sessione guidata, dove il timer continua a scorrere.
+`node scripts/verifica-spiegazioni.js` controlla che nessun campo resti vuoto.
+
 ## Interfaccia
 
 Tema scuro di default con interruttore chiaro/scuro (la scelta resta in un cookie,

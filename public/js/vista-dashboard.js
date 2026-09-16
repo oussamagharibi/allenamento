@@ -104,12 +104,16 @@
 
     const stile = getComputedStyle(document.documentElement);
     const accento = stile.getPropertyValue('--accento').trim() || '#ff7a2d';
+    const testo2 = stile.getPropertyValue('--testo-2').trim() || '#98a4b3';
+    const bordo = stile.getPropertyValue('--bordo').trim() || '#262c36';
+    const superficie = stile.getPropertyValue('--superficie-alta').trim() || '#1b1f27';
+    const testo = stile.getPropertyValue('--testo').trim() || '#eef2f6';
     const recenti = pesi.slice(-12);
 
     miniGrafico = new window.Chart(tela, {
       type: 'line',
       data: {
-        labels: recenti.map(function (p) { return App.dataIta(p.data); }),
+        labels: recenti.map(function (p) { return App.dataIta(p.data).slice(0, 6); }),
         datasets: [{
           data: recenti.map(function (p) { return p.peso; }),
           borderColor: accento,
@@ -124,8 +128,40 @@
         responsive: true,
         maintainAspectRatio: false,
         animation: App.animazioniRidotte() ? false : { duration: 600 },
-        plugins: { legend: { display: false }, tooltip: { enabled: true } },
-        scales: { x: { display: false }, y: { display: false } },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: superficie,
+            borderColor: bordo,
+            borderWidth: 1,
+            titleColor: testo,
+            bodyColor: testo2,
+            displayColors: false,
+            callbacks: {
+              label: function (voce) { return App.numero(voce.parsed.y, 1) + ' kg'; },
+            },
+          },
+        },
+        scales: {
+          // Date sotto e valori a sinistra: il grafico si legge senza toccarlo.
+          x: {
+            display: true,
+            ticks: { color: testo2, maxRotation: 0, autoSkip: true, maxTicksLimit: 4, font: { size: 10 } },
+            grid: { display: false },
+          },
+          y: {
+            display: true,
+            ticks: {
+              color: testo2,
+              maxTicksLimit: 4,
+              font: { size: 10 },
+              callback: function (valore) { return App.numero(valore, 1); },
+            },
+            grid: { color: bordo, drawTicks: false },
+            title: { display: true, text: 'kg', color: testo2, font: { size: 10 } },
+          },
+        },
       },
     });
     return true;
@@ -161,7 +197,7 @@
         '<button type="button" class="btn-contorno btn-piccolo" data-vai="progressi">' +
         '<i data-lucide="plus"></i> Registra</button></div>';
       if (progressi.pesi.length > 1) {
-        html += '<div class="grafico mini"><canvas id="mini-peso" height="110"></canvas></div>';
+        html += '<div class="grafico mini"><canvas id="mini-peso" height="150"></canvas></div>';
       } else {
         html += '<p class="aiuto">Registra almeno due pesate per vedere la curva.</p>';
       }
